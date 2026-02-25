@@ -13,16 +13,26 @@ Modern, queue-driven network discovery and security visibility platform.
 
 ## Quick Start (one command)
 ```bash
-docker compose up --build
+make up
 ```
 
 ### Local URLs
 - Web: <http://localhost:3000>
 - API health: <http://localhost:4000/health>
 
-### Stop
+### Helpers
 ```bash
-docker compose down
+make ps      # containers status
+make logs    # tail logs
+make test    # health + queue smoke test
+make down    # stop stack
+make clean   # down + volumes + dangling image prune
+```
+
+### First-time bootstrap (macOS)
+```bash
+make bootstrap
+colima start
 ```
 
 ## API sample
