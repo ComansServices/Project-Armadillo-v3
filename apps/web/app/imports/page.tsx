@@ -6,6 +6,9 @@ type XmlImportRecord = {
   requestedBy: string;
   rootNode: string | null;
   itemCount: number;
+  normalizedAssetCount: number;
+  skippedAssetCount: number;
+  invalidAssetCount: number;
   createdAt: string;
 };
 
@@ -51,10 +54,10 @@ export default async function ImportsPage() {
       <meta httpEquiv="refresh" content="5" />
 
       <div style={{ overflowX: 'auto', marginTop: 16 }}>
-        <table style={{ borderCollapse: 'collapse', minWidth: 900, width: '100%' }}>
+        <table style={{ borderCollapse: 'collapse', minWidth: 1100, width: '100%' }}>
           <thead>
             <tr>
-              {['Import ID', 'Source', 'Requested By', 'Root Node', 'Items', 'Created'].map((h) => (
+              {['Import ID', 'Source', 'Requested By', 'Root Node', 'Items', 'Normalized', 'Skipped', 'Invalid', 'Created'].map((h) => (
                 <th
                   key={h}
                   style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}
@@ -67,7 +70,7 @@ export default async function ImportsPage() {
           <tbody>
             {imports.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: '12px 10px', color: '#666' }}>
+                <td colSpan={9} style={{ padding: '12px 10px', color: '#666' }}>
                   No imports yet.
                 </td>
               </tr>
@@ -81,6 +84,9 @@ export default async function ImportsPage() {
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.requestedBy}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.rootNode ?? '-'}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.itemCount}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.normalizedAssetCount}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.skippedAssetCount}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.invalidAssetCount}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
                     {new Date(i.createdAt).toLocaleString()}
                   </td>

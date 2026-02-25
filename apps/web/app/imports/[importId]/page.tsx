@@ -6,6 +6,16 @@ type XmlImportDetail = {
   requestedBy: string;
   rootNode: string | null;
   itemCount: number;
+  normalizedAssetCount: number;
+  skippedAssetCount: number;
+  invalidAssetCount: number;
+  qualitySummary: {
+    parsedObjects: number;
+    normalizedAssetCount: number;
+    skippedAssetCount: number;
+    invalidAssetCount: number;
+    reasonBuckets: Record<string, number>;
+  } | null;
   payload: unknown;
   createdAt: string;
 };
@@ -50,6 +60,34 @@ export default async function ImportDetailPage({ params }: { params: { importId:
         <strong>Requested By:</strong> {data.requestedBy} &nbsp; | &nbsp;
         <strong>Root Node:</strong> {data.rootNode ?? '-'} &nbsp; | &nbsp;
         <strong>Items:</strong> {data.itemCount}
+      </div>
+
+      <h2 style={{ marginBottom: 8 }}>Import Quality Summary</h2>
+      <div
+        style={{
+          border: '1px solid #ddd',
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 16,
+          background: '#fafafa'
+        }}
+      >
+        <p style={{ margin: '4px 0' }}>
+          <strong>Normalized:</strong> {data.normalizedAssetCount} &nbsp; | &nbsp;
+          <strong>Skipped:</strong> {data.skippedAssetCount} &nbsp; | &nbsp;
+          <strong>Invalid:</strong> {data.invalidAssetCount}
+        </p>
+        {data.qualitySummary?.reasonBuckets && Object.keys(data.qualitySummary.reasonBuckets).length > 0 ? (
+          <ul style={{ margin: '8px 0 0 18px' }}>
+            {Object.entries(data.qualitySummary.reasonBuckets).map(([k, v]) => (
+              <li key={k}>
+                {k}: {v}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ margin: '8px 0 0 0', color: '#666' }}>No quality issues detected.</p>
+        )}
       </div>
 
       <h2 style={{ marginBottom: 8 }}>Parsed Payload</h2>

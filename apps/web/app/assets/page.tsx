@@ -6,10 +6,21 @@ type AssetRecord = {
   importId: string;
   ip: string | null;
   hostname: string | null;
+  os: string | null;
+  ports: number[];
+  serviceTags: string[];
+  sourceType: string;
   seenCount: number;
   firstSeenAt: string;
   lastSeenAt: string;
   createdAt: string;
+};
+
+type AssetFilters = {
+  ip?: string;
+  hostname?: string;
+  tag?: string;
+  source?: string;
 };
 
 const baseUrl =
@@ -20,8 +31,15 @@ const authHeaders = {
   'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
 };
 
-async function getAssets(): Promise<AssetRecord[]> {
-  const res = await fetch(`${baseUrl}/api/v1/assets?limit=100`, {
+async function getAssets(filters: AssetFilters): Promise<AssetRecord[]> {
+  const qs = new URLSearchParams();
+  qs.set('limit', '100');
+  if (filters.ip) qs.set('ip', filters.ip);
+  if (filters.hostname) qs.set('hostname', filters.hostname);
+  if (filters.tag) qs.set('tag', filters.tag);
+  if (filters.source) qs.set('source', filters.source);
+
+  const res = await fetch(`${baseUrl}/api/v1/assets?${qs.toString()}`, {
     cache: 'no-store',
     headers: authHeaders
   });
@@ -37,8 +55,19 @@ async function getAssets(): Promise<AssetRecord[]> {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function AssetsPage() {
-  const assets = await getAssets();
+export default async function AssetsPage({
+  searchParams
+}: {
+  searchParams: { ip?: string; hostname?: string; tag?: string; source?: string };
+}) {
+  const filters: AssetFilters = {
+    ip: searchParams.ip?.trim() || undefined,
+    hostname: searchParams.hostname?.trim() || undefined,
+    tag: searchParams.tag?.trim() || undefined,
+    source: searchParams.source?.trim() || undefined
+  };
+
+  const assets = await getAssets(filters);
 
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
@@ -48,23 +77,38 @@ export default async function AssetsPage() {
       <h1 style={{ marginBottom: 8 }}>Normalized Assets</h1>
       <p style={{ marginTop: 0 }}>Assets extracted from XML imports (auto-refresh every 5s).</p>
 
+      <form method="get" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(4, minmax(0,1fr))' }}>
+        <input name="ip" placeholder="Filter IP (e.g. 10.0.0)" defaultValue={filters.ip ?? ''} />
+        <input name="hostname" placeholder="Filter hostname" defaultValue={filters.hostname ?? ''} />
+        <input name="tag" placeholder="Filter tag (e.g. web)" defaultValue={filters.tag ?? ''} />
+        <input name="source" placeholder="Filter source (e.g. xml)" defaultValue={filters.source ?? ''} />
+        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8 }}>
+          <button type="submit">Apply filters</button>
+          <Link href="/assets">Reset</Link>
+        </div>
+      </form>
+
       <meta httpEquiv="refresh" content="5" />
 
       <div style={{ overflowX: 'auto', marginTop: 16 }}>
-        <table style={{ borderCollapse: 'collapse', minWidth: 900, width: '100%' }}>
+        <table style={{ borderCollapse: 'collapse', minWidth: 1100, width: '100%' }}>
           <thead>
             <tr>
-              {['Asset ID', 'Identity Key', 'IP', 'Hostname', 'Seen', 'Last Seen', 'Import ID'].map((h) => (
-                <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
-                  {h}
-                </th>
-              ))}
+              {['Asset ID', 'Identity Key', 'IP', 'Hostname', 'Ports', 'Tags', 'Seen', 'Last Seen', 'Import ID'].map(
+                (h) => (
+                  <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
+                    {h}
+                  </th>
+                )
+              )}
             </tr>
           </thead>
           <tbody>
             {assets.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ padding: '12px 10px', color: '#666' }}>No normalized assets yet.</td>
+                <td colSpan={9} style={{ padding: '12px 10px', color: '#666' }}>
+                  No assets matched current filters.
+                </td>
               </tr>
             ) : (
               assets.map((a) => (
@@ -77,6 +121,12 @@ export default async function AssetsPage() {
                   </td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.ip ?? '-'}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.hostname ?? '-'}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
+                    {a.ports?.length ? a.ports.join(', ') : '-'}
+                  </td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
+                    {a.serviceTags?.length ? a.serviceTags.join(', ') : '-'}
+                  </td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.seenCount}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
                     {new Date(a.lastSeenAt).toLocaleString()}
