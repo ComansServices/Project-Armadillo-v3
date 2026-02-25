@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 type XmlImportRecord = {
   id: string;
@@ -86,7 +87,7 @@ async function savePolicyAction(formData: FormData) {
 
   if (!source) return;
 
-  await fetch(`${baseUrl}/api/v1/import-policies`, {
+  const res = await fetch(`${baseUrl}/api/v1/import-policies`, {
     method: 'POST',
     headers: {
       ...adminHeaders,
@@ -101,12 +102,29 @@ async function savePolicyAction(formData: FormData) {
   });
 
   revalidatePath('/imports');
+
+  if (!res.ok) {
+    redirect(`/imports?policyError=${res.status}`);
+  }
+
+  redirect('/imports?policySaved=1');
 }
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function ImportsPage() {
+export default async function ImportsPage({
+  searchParams
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = searchParams ? await searchParams : undefined;
+  const policySaved = params?.policySaved === '1';
+  const policyError = typeof params?.policyError === 'string' ? params.policyError : null;
+  const canEditPolicies = ['admin', 'owner'].includes(
+    (process.env.WEB_ADMIN_ACTOR_ROLE ?? process.env.WEB_ACTOR_ROLE ?? 'viewer').toLowerCase()
+  );
+
   const [imports, trend, policies] = await Promise.all([getImports(), getTrend(), getPolicies()]);
 
   return (
@@ -128,6 +146,17 @@ export default async function ImportsPage() {
       <meta httpEquiv="refresh" content="5" />
 
       <h2 style={{ marginTop: 20, marginBottom: 8 }}>Import Source Policies</h2>
+      {policySaved ? (
+        <p style={{ marginTop: 0, color: '#0b7d29' }}>Policy saved successfully.</p>
+      ) : null}
+      {policyError ? (
+        <p style={{ marginTop: 0, color: '#a61b1b' }}>Policy save failed (HTTP {policyError}).</p>
+      ) : null}
+      {!canEditPolicies ? (
+        <p style={{ marginTop: 0, color: '#666' }}>
+          Policy editor is read-only for current web actor role.
+        </p>
+      ) : null}
       <div style={{ marginBottom: 18, display: 'grid', gap: 8 }}>
         {policies.length === 0 ? (
           <p style={{ color: '#666', margin: 0 }}>No policies visible (viewer mode or none configured).</p>
@@ -135,7 +164,7 @@ export default async function ImportsPage() {
           policies.map((p) => (
             <form
               key={p.source}
-              action={savePolicyAction}
+              action={canEditPolicies ? savePolicyAction : undefined}
               style={{
                 display: 'flex',
                 gap: 8,
@@ -146,38 +175,49 @@ export default async function ImportsPage() {
               }}
             >
               <input name="source" value={p.source} readOnly style={{ minWidth: 140 }} />
-              <select name="enabled" defaultValue={String(p.enabled)}>
+              <select name="enabled" defaultValue={String(p.enabled)} disabled={!canEditPolicies}>
                 <option value="true">enabled</option>
                 <option value="false">disabled</option>
               </select>
-              <select name="defaultQualityMode" defaultValue={p.defaultQualityMode}>
+              <select name="defaultQualityMode" defaultValue={p.defaultQualityMode} disabled={!canEditPolicies}>
                 <option value="strict">strict</option>
                 <option value="lenient">lenient</option>
               </select>
-              <select name="allowBypassToLenient" defaultValue={String(p.allowBypassToLenient)}>
+              <select
+                name="allowBypassToLenient"
+                defaultValue={String(p.allowBypassToLenient)}
+                disabled={!canEditPolicies}
+              >
                 <option value="false">bypass blocked</option>
                 <option value="true">bypass allowed</option>
               </select>
-              <button type="submit">Save</button>
+              <button type="submit" disabled={!canEditPolicies}>
+                Save
+              </button>
             </form>
           ))
         )}
 
-        <form action={savePolicyAction} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input name="source" placeholder="new-source" required />
-          <select name="enabled" defaultValue="true">
+        <form
+          action={canEditPolicies ? savePolicyAction : undefined}
+          style={{ display: 'flex', gap: 8, alignItems: 'center' }}
+        >
+          <input name="source" placeholder="new-source" required disabled={!canEditPolicies} />
+          <select name="enabled" defaultValue="true" disabled={!canEditPolicies}>
             <option value="true">enabled</option>
             <option value="false">disabled</option>
           </select>
-          <select name="defaultQualityMode" defaultValue="strict">
+          <select name="defaultQualityMode" defaultValue="strict" disabled={!canEditPolicies}>
             <option value="strict">strict</option>
             <option value="lenient">lenient</option>
           </select>
-          <select name="allowBypassToLenient" defaultValue="false">
+          <select name="allowBypassToLenient" defaultValue="false" disabled={!canEditPolicies}>
             <option value="false">bypass blocked</option>
             <option value="true">bypass allowed</option>
           </select>
-          <button type="submit">Add policy</button>
+          <button type="submit" disabled={!canEditPolicies}>
+            Add policy
+          </button>
         </form>
       </div>
 
