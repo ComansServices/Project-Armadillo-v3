@@ -3,7 +3,7 @@
 ## Stack
 - **Frontend:** Next.js (App Router) + Tailwind + Cytoscape/ECharts
 - **API:** NestJS (Fastify adapter) + OpenAPI
-- **Workers:** BullMQ + Redis
+- **Workers:** BullMQ + Redis (pipeline stages: naabu -> nmap -> httpx -> nuclei)
 - **DB:** PostgreSQL + Prisma
 - **Auth:** OIDC/SAML via Auth0 or Keycloak (RBAC + MFA)
 - **Infra:** Docker + Terraform + managed Postgres/Redis
@@ -21,17 +21,23 @@ flowchart LR
   A --> R[(Redis)]
   A --> Q[BullMQ Queue]
 
-  Q --> K[Scan Worker Pool]
-  K --> N[Nmap Engine Container]
-  N --> X[Raw XML Artifacts]
-  K --> P
+  Q --> N1[naabu stage]
+  N1 --> N2[nmap stage]
+  N2 --> N3[httpx stage]
+  N3 --> N4[nuclei stage]
+
+  N4 --> X[Normalized Findings + Artifacts]
+  X --> P
 
   A --> C[CVE/Enrichment Service]
   C --> E[External Feeds / NVD / CPE]
   C --> P
 
   A --> O[OTel Collector]
-  K --> O
+  N1 --> O
+  N2 --> O
+  N3 --> O
+  N4 --> O
   W --> O
   O --> G[Grafana/Prometheus]
   O --> S[Sentry]
@@ -56,3 +62,12 @@ flowchart LR
 - `hosts`, `services`, `ports`, `cpe`, `cve_findings`
 - `labels`, `notes`, `diff_reports`, `pdf_reports`
 - `api_clients`, `audit_events`
+
+
+## Practical Scan Pipeline (v1)
+- Stage 1: `naabu` for fast port discovery
+- Stage 2: `nmap` for deep service/version/NSE enumeration
+- Stage 3: `httpx` for web endpoint probing/fingerprinting
+- Stage 4: `nuclei` for scoped template-based checks
+
+Each stage writes structured outputs to Redis queue + PostgreSQL persistence for full traceability.

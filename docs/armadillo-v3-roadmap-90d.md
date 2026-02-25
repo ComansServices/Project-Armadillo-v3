@@ -13,16 +13,17 @@
 - Next.js shell with auth + dashboard layout
 - Worker service with BullMQ connectivity
 - Import pipeline: XML upload -> parse -> persist
+- Implement practical combo execution contract (`naabu -> nmap -> httpx -> nuclei`)
 
 **Exit criteria:** upload XML, view hosts/services in UI.
 
 ## Phase 2 (Weeks 5-7): Scan Execution + Observability
-- Secure scan profile model (safe defaults)
+- Secure scan profile model (safe defaults + tool stage policy)
 - Queue-based scan launch and status tracking
 - Live job status in UI (SSE/WebSocket)
 - OTel traces + metrics + Sentry wiring
 
-**Exit criteria:** launch scan from UI, monitor job lifecycle, artifacts stored.
+**Exit criteria:** launch scan from UI, monitor job lifecycle across all 4 stages, artifacts stored.
 
 ## Phase 3 (Weeks 8-10): Security + Reporting
 - RBAC policies and org/project scoping
@@ -44,3 +45,8 @@
 - **Risk:** nmap execution abuse -> **Control:** strict scan profiles + quotas + audit.
 - **Risk:** queue backlog -> **Control:** bounded concurrency + autoscaling workers.
 - **Risk:** noisy CVE enrichment -> **Control:** async enrichment + cache + retries.
+
+
+## Documentation Deliverables
+- Tooling Matrix doc: `docs/armadillo-v3-tooling-matrix.md`
+- Architecture diagram includes practical combo stage flow.
