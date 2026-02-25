@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import { scanQueue } from './queue';
 import { createScan, getScan, listScans, listScanEvents } from './store';
-import { createXmlImport, listXmlImports } from './imports';
+import { createXmlImport, getXmlImport, listXmlImports } from './imports';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
@@ -165,6 +165,19 @@ app.get('/api/v1/imports', async (req, reply) => {
       createdAt: i.createdAt
     }))
   };
+});
+
+app.get('/api/v1/imports/:importId', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { importId } = req.params as { importId: string };
+  const data = await getXmlImport(importId);
+  if (!data) {
+    return reply.code(404).send({ error: 'Import not found' });
+  }
+
+  return data;
 });
 
 app.listen({ host: '0.0.0.0', port: 4000 }).then(() => {

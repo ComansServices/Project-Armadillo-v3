@@ -22,14 +22,22 @@ type ScanEvent = {
 const baseUrl =
   process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
+const authHeaders = {
+  'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
+  'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
+};
+
 async function getScan(scanId: string): Promise<ScanRecord> {
-  const res = await fetch(`${baseUrl}/api/v1/scans/${scanId}`, { cache: 'no-store' });
+  const res = await fetch(`${baseUrl}/api/v1/scans/${scanId}`, { cache: 'no-store', headers: authHeaders });
   if (!res.ok) throw new Error(`Scan fetch failed (${res.status})`);
   return res.json();
 }
 
 async function getEvents(scanId: string): Promise<ScanEvent[]> {
-  const res = await fetch(`${baseUrl}/api/v1/scans/${scanId}/events`, { cache: 'no-store' });
+  const res = await fetch(`${baseUrl}/api/v1/scans/${scanId}/events`, {
+    cache: 'no-store',
+    headers: authHeaders
+  });
   if (!res.ok) throw new Error(`Events fetch failed (${res.status})`);
   const data = (await res.json()) as { events: ScanEvent[] };
   return data.events ?? [];
@@ -48,6 +56,9 @@ export default async function ScanDetailPage({ params }: { params: { scanId: str
       </p>
       <h1 style={{ marginBottom: 6 }}>Scan Detail</h1>
       <p style={{ marginTop: 0, color: '#444' }}>{scan.id}</p>
+      <p style={{ marginTop: 0 }}>
+        <Link href="/imports">View XML imports →</Link>
+      </p>
 
       <div style={{ marginTop: 12, marginBottom: 20 }}>
         <strong>Status:</strong> {scan.status.toUpperCase()} &nbsp; | &nbsp;

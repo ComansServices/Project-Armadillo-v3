@@ -9,12 +9,18 @@ type ScanRecord = {
   updatedAt: string;
 };
 
-async function getScans(): Promise<ScanRecord[]> {
-  const baseUrl =
-    process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+const baseUrl =
+  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
+const authHeaders = {
+  'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
+  'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
+};
+
+async function getScans(): Promise<ScanRecord[]> {
   const res = await fetch(`${baseUrl}/api/v1/scans?limit=30`, {
-    cache: 'no-store'
+    cache: 'no-store',
+    headers: authHeaders
   });
 
   if (!res.ok) {
@@ -35,6 +41,9 @@ export default async function HomePage() {
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
       <h1 style={{ marginBottom: 8 }}>Armadillo v3</h1>
       <p style={{ marginTop: 0 }}>Live scan queue/status view (auto-refresh every 5s).</p>
+      <p style={{ marginTop: 0 }}>
+        <Link href="/imports">View XML imports →</Link>
+      </p>
 
       <meta httpEquiv="refresh" content="5" />
 

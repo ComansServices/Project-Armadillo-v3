@@ -49,3 +49,7 @@ export async function listXmlImports(limit = 25) {
     take: limit
   });
 }
+
+export async function getXmlImport(id: string) {
+  return prisma.xmlImport.findUnique({ where: { id } });
+}
