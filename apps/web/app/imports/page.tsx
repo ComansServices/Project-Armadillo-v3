@@ -12,8 +12,17 @@ type XmlImportRecord = {
   createdAt: string;
 };
 
+type ImportTrendPoint = {
+  id: string;
+  createdAt: string;
+  normalizedAssetCount: number;
+  skippedAssetCount: number;
+  invalidAssetCount: number;
+};
+
 const baseUrl =
   process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+const publicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
 const authHeaders = {
   'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
@@ -34,11 +43,25 @@ async function getImports(): Promise<XmlImportRecord[]> {
   return data.imports ?? [];
 }
 
+async function getTrend(): Promise<ImportTrendPoint[]> {
+  const res = await fetch(`${baseUrl}/api/v1/imports/quality-trend?limit=10`, {
+    cache: 'no-store',
+    headers: authHeaders
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch trend (${res.status})`);
+  }
+
+  const data = (await res.json()) as { trend: ImportTrendPoint[] };
+  return data.trend ?? [];
+}
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function ImportsPage() {
-  const imports = await getImports();
+  const [imports, trend] = await Promise.all([getImports(), getTrend()]);
 
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
@@ -50,8 +73,48 @@ export default async function ImportsPage() {
       <p style={{ marginTop: 0 }}>
         <Link href="/assets">View normalized assets →</Link>
       </p>
+      <p style={{ marginTop: 0 }}>
+        <a href={`${publicApiBaseUrl}/api/v1/imports.csv?limit=500`} target="_blank" rel="noreferrer">
+          Export imports CSV →
+        </a>
+      </p>
 
       <meta httpEquiv="refresh" content="5" />
+
+      <h2 style={{ marginTop: 20, marginBottom: 8 }}>Quality Trend (last 10 imports)</h2>
+      <div style={{ overflowX: 'auto', marginBottom: 18 }}>
+        <table style={{ borderCollapse: 'collapse', minWidth: 700, width: '100%' }}>
+          <thead>
+            <tr>
+              {['When', 'Normalized', 'Skipped', 'Invalid'].map((h) => (
+                <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {trend.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{ padding: '12px 10px', color: '#666' }}>
+                  No trend points yet.
+                </td>
+              </tr>
+            ) : (
+              trend.map((t) => (
+                <tr key={t.id}>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
+                    {new Date(t.createdAt).toLocaleString()}
+                  </td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{t.normalizedAssetCount}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{t.skippedAssetCount}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{t.invalidAssetCount}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <div style={{ overflowX: 'auto', marginTop: 16 }}>
         <table style={{ borderCollapse: 'collapse', minWidth: 1100, width: '100%' }}>

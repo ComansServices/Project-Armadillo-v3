@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import { scanQueue } from './queue';
 import { createScan, getScan, listScans, listScanEvents } from './store';
-import { createXmlImport, getXmlImport, listXmlImports } from './imports';
+import { createXmlImport, getXmlImport, listImportQualityTrend, listXmlImports } from './imports';
 import { backfillAssetIdentityKeys, getAsset, listAssets } from './assets';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
@@ -175,6 +175,62 @@ app.get('/api/v1/imports', async (req, reply) => {
       createdAt: i.createdAt
     }))
   };
+});
+
+app.get('/api/v1/imports/quality-trend', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { limit } = req.query as { limit?: string };
+  const parsedLimit = Math.min(Math.max(Number(limit ?? 14), 1), 90);
+  const rows = await listImportQualityTrend(Number.isNaN(parsedLimit) ? 14 : parsedLimit);
+  return { trend: rows };
+});
+
+app.get('/api/v1/imports.csv', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { limit } = req.query as { limit?: string };
+  const parsedLimit = Math.min(Math.max(Number(limit ?? 200), 1), 1000);
+  const imports = await listXmlImports(Number.isNaN(parsedLimit) ? 200 : parsedLimit);
+
+  const header = [
+    'id',
+    'source',
+    'requestedBy',
+    'rootNode',
+    'itemCount',
+    'normalizedAssetCount',
+    'skippedAssetCount',
+    'invalidAssetCount',
+    'createdAt'
+  ];
+
+  const esc = (v: unknown) => `"${String(v ?? '').replaceAll('"', '""')}"`;
+  const lines = [header.join(',')];
+
+  for (const i of imports) {
+    lines.push(
+      [
+        i.id,
+        i.source,
+        i.requestedBy,
+        i.rootNode,
+        i.itemCount,
+        i.normalizedAssetCount,
+        i.skippedAssetCount,
+        i.invalidAssetCount,
+        i.createdAt.toISOString()
+      ]
+        .map(esc)
+        .join(',')
+    );
+  }
+
+  reply.header('content-type', 'text/csv; charset=utf-8');
+  reply.header('content-disposition', 'attachment; filename="armadillo-imports.csv"');
+  return lines.join('\n');
 });
 
 app.get('/api/v1/imports/:importId', async (req, reply) => {

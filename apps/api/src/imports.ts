@@ -225,3 +225,17 @@ export async function listXmlImports(limit = 25) {
 export async function getXmlImport(id: string) {
   return prisma.xmlImport.findUnique({ where: { id } });
 }
+
+export async function listImportQualityTrend(limit = 14) {
+  return prisma.xmlImport.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    select: {
+      id: true,
+      createdAt: true,
+      normalizedAssetCount: true,
+      skippedAssetCount: true,
+      invalidAssetCount: true
+    }
+  });
+}
