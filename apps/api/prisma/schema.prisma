@@ -60,7 +60,7 @@ model XmlImport {
 
 model Asset {
   id            String   @id
-  identityKey   String?  @unique
+  identityKey   String   @unique
   importId      String
   ip            String?
   hostname      String?
