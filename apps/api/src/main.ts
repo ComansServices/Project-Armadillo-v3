@@ -122,7 +122,7 @@ app.post('/api/v1/imports/xml', async (req, reply) => {
   const actor = requireRole(req, reply, 'staff');
   if (!actor) return;
 
-  const body = req.body as { xml?: string; source?: string };
+  const body = req.body as { xml?: string; source?: string; qualityMode?: 'lenient' | 'strict' };
   if (!body?.xml || typeof body.xml !== 'string' || body.xml.trim().length === 0) {
     return reply.code(400).send({ error: 'xml payload is required' });
   }
@@ -131,13 +131,17 @@ app.post('/api/v1/imports/xml', async (req, reply) => {
     const created = await createXmlImport({
       xml: body.xml,
       source: body.source,
-      requestedBy: actor.actorId
+      requestedBy: actor.actorId,
+      qualityMode: body.qualityMode
     });
 
     app.log.info({ actorId: actor.actorId, importId: created.id, rootNode: created.rootNode }, 'xml import created');
 
     return {
       importId: created.id,
+      qualityMode: created.qualityMode,
+      qualityStatus: created.qualityStatus,
+      alertTriggered: created.alertTriggered,
       rootNode: created.rootNode,
       itemCount: created.itemCount,
       normalizedAssetCount: created.normalizedAssetCount,
@@ -150,6 +154,10 @@ app.post('/api/v1/imports/xml', async (req, reply) => {
     };
   } catch (err) {
     req.log.error({ err }, 'xml parse/import failed');
+    const e = err as Error & { code?: string; details?: object };
+    if (e.code === 'STRICT_QUALITY_GATE_FAILED') {
+      return reply.code(422).send({ error: 'strict_quality_gate_failed', details: e.details });
+    }
     return reply.code(400).send({ error: 'invalid_xml_or_import_failed' });
   }
 });
@@ -169,6 +177,9 @@ app.get('/api/v1/imports', async (req, reply) => {
       requestedBy: i.requestedBy,
       rootNode: i.rootNode,
       itemCount: i.itemCount,
+      qualityMode: i.qualityMode,
+      qualityStatus: i.qualityStatus,
+      alertTriggered: i.alertTriggered,
       normalizedAssetCount: i.normalizedAssetCount,
       skippedAssetCount: i.skippedAssetCount,
       invalidAssetCount: i.invalidAssetCount,
@@ -209,6 +220,9 @@ app.get('/api/v1/imports.csv', async (req, reply) => {
     'requestedBy',
     'rootNode',
     'itemCount',
+    'qualityMode',
+    'qualityStatus',
+    'alertTriggered',
     'normalizedAssetCount',
     'skippedAssetCount',
     'invalidAssetCount',
@@ -226,6 +240,9 @@ app.get('/api/v1/imports.csv', async (req, reply) => {
         i.requestedBy,
         i.rootNode,
         i.itemCount,
+        i.qualityMode,
+        i.qualityStatus,
+        i.alertTriggered,
         i.normalizedAssetCount,
         i.skippedAssetCount,
         i.invalidAssetCount,

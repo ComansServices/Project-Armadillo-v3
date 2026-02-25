@@ -48,12 +48,16 @@ model XmlImport {
   id                    String    @id
   source                String?
   requestedBy           String
+  qualityMode           String    @default("lenient")
+  qualityStatus         String    @default("pass")
+  alertTriggered        Boolean   @default(false)
   rootNode              String?
   itemCount             Int       @default(0)
   normalizedAssetCount  Int       @default(0)
   skippedAssetCount     Int       @default(0)
   invalidAssetCount     Int       @default(0)
   qualitySummary        Json?
+  rejectArtifact        Json?
   payload               Json
   createdAt             DateTime  @default(now())
   assets                Asset[]

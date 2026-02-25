@@ -6,6 +6,7 @@ export interface XmlImportInput {
   xml: string;
   requestedBy: string;
   source?: string;
+  qualityMode?: 'lenient' | 'strict';
 }
 
 type AssetCandidate = {
@@ -17,6 +18,11 @@ type AssetCandidate = {
   serviceTags: string[];
   sourceType: string;
   raw: object;
+};
+
+type RejectNode = {
+  reason: string;
+  node: object;
 };
 
 type NormalizationStats = {
@@ -84,10 +90,15 @@ function toNumberArray(v: unknown): number[] {
   return [];
 }
 
-function normalizeAssetCandidates(parsed: Record<string, unknown>): { assets: AssetCandidate[]; stats: NormalizationStats } {
+function normalizeAssetCandidates(parsed: Record<string, unknown>): {
+  assets: AssetCandidate[];
+  stats: NormalizationStats;
+  rejected: RejectNode[];
+} {
   const objects = collectObjects(parsed);
   const dedup = new Map<string, AssetCandidate>();
   const reasonBuckets: Record<string, number> = {};
+  const rejected: RejectNode[] = [];
 
   let skipped = 0;
   let invalid = 0;
@@ -100,6 +111,7 @@ function normalizeAssetCandidates(parsed: Record<string, unknown>): { assets: As
     if (!ip && !hostname) {
       skipped += 1;
       reasonBuckets['missing_identity'] = (reasonBuckets['missing_identity'] ?? 0) + 1;
+      rejected.push({ reason: 'missing_identity', node: record });
       continue;
     }
 
@@ -110,6 +122,7 @@ function normalizeAssetCandidates(parsed: Record<string, unknown>): { assets: As
     if ((record.port !== undefined || record.ports !== undefined) && ports.length === 0) {
       invalid += 1;
       reasonBuckets['invalid_ports'] = (reasonBuckets['invalid_ports'] ?? 0) + 1;
+      rejected.push({ reason: 'invalid_ports', node: record });
     }
 
     const identityKey = ip && ip.length > 0 ? `ip:${ip}` : `host:${(hostname ?? '').toLowerCase()}`;
@@ -135,16 +148,43 @@ function normalizeAssetCandidates(parsed: Record<string, unknown>): { assets: As
       skippedAssetCount: skipped,
       invalidAssetCount: invalid,
       reasonBuckets
-    }
+    },
+    rejected
   };
 }
 
+function getQualityStatus(stats: NormalizationStats): { qualityStatus: 'pass' | 'warn' | 'fail'; alertTriggered: boolean } {
+  const denom = Math.max(stats.normalizedAssetCount + stats.skippedAssetCount, 1);
+  const badRatio = (stats.skippedAssetCount + stats.invalidAssetCount) / denom;
+
+  if (badRatio >= 0.35 || stats.invalidAssetCount >= 5) return { qualityStatus: 'fail', alertTriggered: true };
+  if (badRatio >= 0.15 || stats.invalidAssetCount >= 2) return { qualityStatus: 'warn', alertTriggered: true };
+  return { qualityStatus: 'pass', alertTriggered: false };
+}
+
 export async function createXmlImport(input: XmlImportInput) {
+  const qualityMode = input.qualityMode ?? 'lenient';
   const parsed = parser.parse(input.xml) as Record<string, unknown>;
   const rootNode = Object.keys(parsed)[0] ?? null;
   const itemCount = estimateItemCount(parsed);
-  const { assets, stats } = normalizeAssetCandidates(parsed);
+  const { assets, stats, rejected } = normalizeAssetCandidates(parsed);
   const importId = randomUUID();
+
+  const { qualityStatus, alertTriggered } = getQualityStatus(stats);
+  if (qualityMode === 'strict' && qualityStatus === 'fail') {
+    const err = new Error('strict_quality_gate_failed') as Error & {
+      details?: object;
+      code?: string;
+    };
+    err.code = 'STRICT_QUALITY_GATE_FAILED';
+    err.details = {
+      qualityStatus,
+      qualityMode,
+      stats,
+      rejectedCount: rejected.length
+    };
+    throw err;
+  }
 
   const created = await prisma.$transaction(async (tx) => {
     const saved = await tx.xmlImport.create({
@@ -152,12 +192,16 @@ export async function createXmlImport(input: XmlImportInput) {
         id: importId,
         source: input.source ?? null,
         requestedBy: input.requestedBy,
+        qualityMode,
+        qualityStatus,
+        alertTriggered,
         rootNode,
         itemCount,
         normalizedAssetCount: stats.normalizedAssetCount,
         skippedAssetCount: stats.skippedAssetCount,
         invalidAssetCount: stats.invalidAssetCount,
         qualitySummary: stats,
+        rejectArtifact: { rejected: rejected.slice(0, 100), rejectedCount: rejected.length },
         payload: parsed as object
       }
     });
@@ -208,7 +252,10 @@ export async function createXmlImport(input: XmlImportInput) {
       updatedAssetCount: updatedAssets,
       skippedAssetCount: stats.skippedAssetCount,
       invalidAssetCount: stats.invalidAssetCount,
-      qualitySummary: stats
+      qualitySummary: stats,
+      qualityStatus,
+      qualityMode,
+      alertTriggered
     };
   });
 
@@ -235,7 +282,8 @@ export async function listImportQualityTrend(limit = 14) {
       createdAt: true,
       normalizedAssetCount: true,
       skippedAssetCount: true,
-      invalidAssetCount: true
+      invalidAssetCount: true,
+      qualityStatus: true
     }
   });
 }
@@ -285,9 +333,15 @@ export async function getImportQualityDigest() {
     invalid: sum(previous, 'invalidAssetCount')
   };
 
+  const shouldAlert =
+    currentSummary.invalid >= 5 ||
+    currentSummary.skipped >= 10 ||
+    (currentSummary.imports > 0 && (currentSummary.invalid + currentSummary.skipped) / Math.max(currentSummary.items, 1) >= 0.25);
+
   return {
     generatedAt: now.toISOString(),
     windowHours: 24,
+    shouldAlert,
     current: currentSummary,
     previous: previousSummary,
     delta: {

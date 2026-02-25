@@ -6,6 +6,9 @@ type XmlImportDetail = {
   requestedBy: string;
   rootNode: string | null;
   itemCount: number;
+  qualityMode: 'lenient' | 'strict';
+  qualityStatus: 'pass' | 'warn' | 'fail';
+  alertTriggered: boolean;
   normalizedAssetCount: number;
   skippedAssetCount: number;
   invalidAssetCount: number;
@@ -15,6 +18,10 @@ type XmlImportDetail = {
     skippedAssetCount: number;
     invalidAssetCount: number;
     reasonBuckets: Record<string, number>;
+  } | null;
+  rejectArtifact: {
+    rejected: Array<{ reason: string; node: unknown }>;
+    rejectedCount: number;
   } | null;
   payload: unknown;
   createdAt: string;
@@ -73,6 +80,8 @@ export default async function ImportDetailPage({ params }: { params: { importId:
         }}
       >
         <p style={{ margin: '4px 0' }}>
+          <strong>Mode:</strong> {data.qualityMode.toUpperCase()} &nbsp; | &nbsp;
+          <strong>Status:</strong> {data.qualityStatus.toUpperCase()} {data.alertTriggered ? '⚠️' : ''} &nbsp; | &nbsp;
           <strong>Normalized:</strong> {data.normalizedAssetCount} &nbsp; | &nbsp;
           <strong>Skipped:</strong> {data.skippedAssetCount} &nbsp; | &nbsp;
           <strong>Invalid:</strong> {data.invalidAssetCount}
@@ -89,6 +98,26 @@ export default async function ImportDetailPage({ params }: { params: { importId:
           <p style={{ margin: '8px 0 0 0', color: '#666' }}>No quality issues detected.</p>
         )}
       </div>
+
+      {data.rejectArtifact?.rejectedCount ? (
+        <>
+          <h2 style={{ marginBottom: 8 }}>Reject Artifact (sample)</h2>
+          <pre
+            style={{
+              background: '#1a0f0f',
+              color: '#ffdede',
+              padding: 14,
+              borderRadius: 8,
+              overflowX: 'auto',
+              fontSize: 12,
+              lineHeight: 1.4,
+              marginBottom: 16
+            }}
+          >
+            {JSON.stringify(data.rejectArtifact, null, 2)}
+          </pre>
+        </>
+      ) : null}
 
       <h2 style={{ marginBottom: 8 }}>Parsed Payload</h2>
       <pre

@@ -6,6 +6,9 @@ type XmlImportRecord = {
   requestedBy: string;
   rootNode: string | null;
   itemCount: number;
+  qualityMode: 'lenient' | 'strict';
+  qualityStatus: 'pass' | 'warn' | 'fail';
+  alertTriggered: boolean;
   normalizedAssetCount: number;
   skippedAssetCount: number;
   invalidAssetCount: number;
@@ -15,6 +18,7 @@ type XmlImportRecord = {
 type ImportTrendPoint = {
   id: string;
   createdAt: string;
+  qualityStatus: 'pass' | 'warn' | 'fail';
   normalizedAssetCount: number;
   skippedAssetCount: number;
   invalidAssetCount: number;
@@ -86,7 +90,7 @@ export default async function ImportsPage() {
         <table style={{ borderCollapse: 'collapse', minWidth: 700, width: '100%' }}>
           <thead>
             <tr>
-              {['When', 'Normalized', 'Skipped', 'Invalid'].map((h) => (
+              {['When', 'Status', 'Normalized', 'Skipped', 'Invalid'].map((h) => (
                 <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
                   {h}
                 </th>
@@ -96,7 +100,7 @@ export default async function ImportsPage() {
           <tbody>
             {trend.length === 0 ? (
               <tr>
-                <td colSpan={4} style={{ padding: '12px 10px', color: '#666' }}>
+                <td colSpan={5} style={{ padding: '12px 10px', color: '#666' }}>
                   No trend points yet.
                 </td>
               </tr>
@@ -105,6 +109,9 @@ export default async function ImportsPage() {
                 <tr key={t.id}>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
                     {new Date(t.createdAt).toLocaleString()}
+                  </td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', textTransform: 'uppercase' }}>
+                    {t.qualityStatus}
                   </td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{t.normalizedAssetCount}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{t.skippedAssetCount}</td>
@@ -120,7 +127,7 @@ export default async function ImportsPage() {
         <table style={{ borderCollapse: 'collapse', minWidth: 1100, width: '100%' }}>
           <thead>
             <tr>
-              {['Import ID', 'Source', 'Requested By', 'Root Node', 'Items', 'Normalized', 'Skipped', 'Invalid', 'Created'].map((h) => (
+              {['Import ID', 'Source', 'Requested By', 'Root Node', 'Items', 'Mode', 'Status', 'Normalized', 'Skipped', 'Invalid', 'Created'].map((h) => (
                 <th
                   key={h}
                   style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}
@@ -133,7 +140,7 @@ export default async function ImportsPage() {
           <tbody>
             {imports.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ padding: '12px 10px', color: '#666' }}>
+                <td colSpan={11} style={{ padding: '12px 10px', color: '#666' }}>
                   No imports yet.
                 </td>
               </tr>
@@ -147,6 +154,10 @@ export default async function ImportsPage() {
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.requestedBy}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.rootNode ?? '-'}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.itemCount}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', textTransform: 'uppercase' }}>{i.qualityMode}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', textTransform: 'uppercase' }}>
+                    {i.qualityStatus}{i.alertTriggered ? ' ⚠️' : ''}
+                  </td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.normalizedAssetCount}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.skippedAssetCount}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.invalidAssetCount}</td>
