@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import { scanQueue } from './queue';
 import { createScan, getScan, listScans, listScanEvents } from './store';
-import { createXmlImport, getXmlImport, listImportQualityTrend, listXmlImports } from './imports';
+import { createXmlImport, getImportQualityDigest, getXmlImport, listImportQualityTrend, listXmlImports } from './imports';
 import { backfillAssetIdentityKeys, getAsset, listAssets } from './assets';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
@@ -185,6 +185,14 @@ app.get('/api/v1/imports/quality-trend', async (req, reply) => {
   const parsedLimit = Math.min(Math.max(Number(limit ?? 14), 1), 90);
   const rows = await listImportQualityTrend(Number.isNaN(parsedLimit) ? 14 : parsedLimit);
   return { trend: rows };
+});
+
+app.get('/api/v1/imports/quality-digest', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const digest = await getImportQualityDigest();
+  return digest;
 });
 
 app.get('/api/v1/imports.csv', async (req, reply) => {

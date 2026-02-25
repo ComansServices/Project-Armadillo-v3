@@ -239,3 +239,64 @@ export async function listImportQualityTrend(limit = 14) {
     }
   });
 }
+
+export async function getImportQualityDigest() {
+  const now = new Date();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const startCurrent = new Date(now.getTime() - dayMs);
+  const startPrevious = new Date(now.getTime() - dayMs * 2);
+
+  const [current, previous] = await Promise.all([
+    prisma.xmlImport.findMany({ where: { createdAt: { gte: startCurrent } } }),
+    prisma.xmlImport.findMany({ where: { createdAt: { gte: startPrevious, lt: startCurrent } } })
+  ]);
+
+  const sum = (rows: typeof current, key: 'itemCount' | 'normalizedAssetCount' | 'skippedAssetCount' | 'invalidAssetCount') =>
+    rows.reduce((acc, r) => acc + (r[key] ?? 0), 0);
+
+  const aggregateReasons = (rows: typeof current) => {
+    const bucket: Record<string, number> = {};
+    for (const r of rows) {
+      const summary = r.qualitySummary as { reasonBuckets?: Record<string, number> } | null;
+      const reasons = summary?.reasonBuckets ?? {};
+      for (const [k, v] of Object.entries(reasons)) {
+        bucket[k] = (bucket[k] ?? 0) + (Number(v) || 0);
+      }
+    }
+    return Object.entries(bucket)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([reason, count]) => ({ reason, count }));
+  };
+
+  const currentSummary = {
+    imports: current.length,
+    items: sum(current, 'itemCount'),
+    normalized: sum(current, 'normalizedAssetCount'),
+    skipped: sum(current, 'skippedAssetCount'),
+    invalid: sum(current, 'invalidAssetCount')
+  };
+
+  const previousSummary = {
+    imports: previous.length,
+    items: sum(previous, 'itemCount'),
+    normalized: sum(previous, 'normalizedAssetCount'),
+    skipped: sum(previous, 'skippedAssetCount'),
+    invalid: sum(previous, 'invalidAssetCount')
+  };
+
+  return {
+    generatedAt: now.toISOString(),
+    windowHours: 24,
+    current: currentSummary,
+    previous: previousSummary,
+    delta: {
+      imports: currentSummary.imports - previousSummary.imports,
+      items: currentSummary.items - previousSummary.items,
+      normalized: currentSummary.normalized - previousSummary.normalized,
+      skipped: currentSummary.skipped - previousSummary.skipped,
+      invalid: currentSummary.invalid - previousSummary.invalid
+    },
+    topReasonBuckets: aggregateReasons(current)
+  };
+}
