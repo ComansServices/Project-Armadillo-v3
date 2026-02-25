@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import { scanQueue } from './queue';
 import { createScan, getScan, listScans, listScanEvents } from './store';
+import { createXmlImport, listXmlImports } from './imports';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
@@ -114,6 +115,56 @@ app.get('/api/v1/scans/:scanId/events', async (req, reply) => {
   const events = await listScanEvents(scanId, 200);
   app.log.info({ actorId: actor.actorId, role: actor.role, scanId, count: events.length }, 'scan events viewed');
   return { events };
+});
+
+app.post('/api/v1/imports/xml', async (req, reply) => {
+  const actor = requireRole(req, reply, 'staff');
+  if (!actor) return;
+
+  const body = req.body as { xml?: string; source?: string };
+  if (!body?.xml || typeof body.xml !== 'string' || body.xml.trim().length === 0) {
+    return reply.code(400).send({ error: 'xml payload is required' });
+  }
+
+  try {
+    const created = await createXmlImport({
+      xml: body.xml,
+      source: body.source,
+      requestedBy: actor.actorId
+    });
+
+    app.log.info({ actorId: actor.actorId, importId: created.id, rootNode: created.rootNode }, 'xml import created');
+
+    return {
+      importId: created.id,
+      rootNode: created.rootNode,
+      itemCount: created.itemCount,
+      createdAt: created.createdAt
+    };
+  } catch (err) {
+    req.log.error({ err }, 'xml parse/import failed');
+    return reply.code(400).send({ error: 'invalid_xml_or_import_failed' });
+  }
+});
+
+app.get('/api/v1/imports', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { limit } = req.query as { limit?: string };
+  const parsedLimit = Math.min(Math.max(Number(limit ?? 25), 1), 100);
+  const imports = await listXmlImports(Number.isNaN(parsedLimit) ? 25 : parsedLimit);
+
+  return {
+    imports: imports.map((i) => ({
+      id: i.id,
+      source: i.source,
+      requestedBy: i.requestedBy,
+      rootNode: i.rootNode,
+      itemCount: i.itemCount,
+      createdAt: i.createdAt
+    }))
+  };
 });
 
 app.listen({ host: '0.0.0.0', port: 4000 }).then(() => {

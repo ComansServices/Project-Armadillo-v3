@@ -43,3 +43,16 @@ model ScanEvent {
   @@index([scanId, createdAt])
   @@map("scan_events")
 }
+
+model XmlImport {
+  id           String   @id
+  source       String?
+  requestedBy  String
+  rootNode     String?
+  itemCount    Int      @default(0)
+  payload      Json
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("xml_imports")
+}

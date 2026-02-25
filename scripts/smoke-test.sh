@@ -52,6 +52,24 @@ done
 
 echo
 
+echo "[4/4] XML import smoke"
+XML_RESP=$(curl -fsS -X POST http://localhost:4000/api/v1/imports/xml \
+  -H 'content-type: application/json' \
+  -H 'x-armadillo-user: smoke-test' \
+  -H 'x-armadillo-role: staff' \
+  -d '{
+    "source":"smoke-test",
+    "xml":"<assets><asset><ip>10.0.0.1</ip></asset><asset><ip>10.0.0.2</ip></asset></assets>"
+  }')
+
+echo "$XML_RESP" | tee /tmp/armadillo_import_create.json
+
+curl -fsS "http://localhost:4000/api/v1/imports?limit=5" \
+  -H 'x-armadillo-user: smoke-test' \
+  -H 'x-armadillo-role: viewer' | tee /tmp/armadillo_import_list.json
+
+echo
+
 echo "Worker tail:"
 docker logs --tail 20 project-armadillo-v3-worker-1 || true
 
