@@ -24,6 +24,13 @@ type ImportTrendPoint = {
   invalidAssetCount: number;
 };
 
+type ImportPolicy = {
+  source: string;
+  enabled: boolean;
+  defaultQualityMode: 'lenient' | 'strict';
+  allowBypassToLenient: boolean;
+};
+
 const baseUrl =
   process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 const publicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
@@ -38,11 +45,7 @@ async function getImports(): Promise<XmlImportRecord[]> {
     cache: 'no-store',
     headers: authHeaders
   });
-
-  if (!res.ok) {
-    throw new Error(`Failed to fetch imports (${res.status})`);
-  }
-
+  if (!res.ok) throw new Error(`Failed to fetch imports (${res.status})`);
   const data = (await res.json()) as { imports: XmlImportRecord[] };
   return data.imports ?? [];
 }
@@ -52,20 +55,26 @@ async function getTrend(): Promise<ImportTrendPoint[]> {
     cache: 'no-store',
     headers: authHeaders
   });
-
-  if (!res.ok) {
-    throw new Error(`Failed to fetch trend (${res.status})`);
-  }
-
+  if (!res.ok) throw new Error(`Failed to fetch trend (${res.status})`);
   const data = (await res.json()) as { trend: ImportTrendPoint[] };
   return data.trend ?? [];
+}
+
+async function getPolicies(): Promise<ImportPolicy[]> {
+  const res = await fetch(`${baseUrl}/api/v1/import-policies`, {
+    cache: 'no-store',
+    headers: authHeaders
+  });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { policies: ImportPolicy[] };
+  return data.policies ?? [];
 }
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function ImportsPage() {
-  const [imports, trend] = await Promise.all([getImports(), getTrend()]);
+  const [imports, trend, policies] = await Promise.all([getImports(), getTrend(), getPolicies()]);
 
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
@@ -84,6 +93,43 @@ export default async function ImportsPage() {
       </p>
 
       <meta httpEquiv="refresh" content="5" />
+
+      <h2 style={{ marginTop: 20, marginBottom: 8 }}>Import Source Policies</h2>
+      <div style={{ overflowX: 'auto', marginBottom: 18 }}>
+        <table style={{ borderCollapse: 'collapse', minWidth: 700, width: '100%' }}>
+          <thead>
+            <tr>
+              {['Source', 'Enabled', 'Default Mode', 'Lenient Bypass'].map((h) => (
+                <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {policies.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{ padding: '12px 10px', color: '#666' }}>
+                  No policies visible (viewer mode or none configured).
+                </td>
+              </tr>
+            ) : (
+              policies.map((p) => (
+                <tr key={p.source}>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{p.source}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{p.enabled ? 'yes' : 'no'}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', textTransform: 'uppercase' }}>
+                    {p.defaultQualityMode}
+                  </td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
+                    {p.allowBypassToLenient ? 'allowed' : 'blocked'}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <h2 style={{ marginTop: 20, marginBottom: 8 }}>Quality Trend (last 10 imports)</h2>
       <div style={{ overflowX: 'auto', marginBottom: 18 }}>
@@ -128,10 +174,7 @@ export default async function ImportsPage() {
           <thead>
             <tr>
               {['Import ID', 'Source', 'Requested By', 'Root Node', 'Items', 'Mode', 'Status', 'Normalized', 'Skipped', 'Invalid', 'Created'].map((h) => (
-                <th
-                  key={h}
-                  style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}
-                >
+                <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
                   {h}
                 </th>
               ))}
@@ -156,7 +199,8 @@ export default async function ImportsPage() {
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.itemCount}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', textTransform: 'uppercase' }}>{i.qualityMode}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', textTransform: 'uppercase' }}>
-                    {i.qualityStatus}{i.alertTriggered ? ' ⚠️' : ''}
+                    {i.qualityStatus}
+                    {i.alertTriggered ? ' ⚠️' : ''}
                   </td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.normalizedAssetCount}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{i.skippedAssetCount}</td>

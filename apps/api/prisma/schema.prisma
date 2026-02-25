@@ -66,6 +66,17 @@ model XmlImport {
   @@map("xml_imports")
 }
 
+model ImportSourcePolicy {
+  source                 String   @id
+  enabled                Boolean  @default(true)
+  defaultQualityMode     String   @default("strict")
+  allowBypassToLenient   Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @default(now()) @updatedAt
+
+  @@map("import_source_policies")
+}
+
 model Asset {
   id            String   @id
   identityKey   String   @unique

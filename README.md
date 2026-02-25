@@ -73,7 +73,7 @@ curl -X POST http://localhost:4000/api/v1/imports/xml \
   -H 'content-type: application/json' \
   -H 'x-armadillo-user: jason' \
   -H 'x-armadillo-role: staff' \
-  -d '{"source":"manual","xml":"<assets><asset><ip>10.0.0.1</ip><hostname>srv-1</hostname></asset></assets>"}'
+  -d '{"source":"manual","qualityMode":"strict","xml":"<assets><asset><ip>10.0.0.1</ip><hostname>srv-1</hostname></asset></assets>"}'
 
 curl http://localhost:4000/api/v1/assets?limit=20 \
   -H 'x-armadillo-user: jason' \
@@ -82,6 +82,21 @@ curl http://localhost:4000/api/v1/assets?limit=20 \
 curl "http://localhost:4000/api/v1/assets?tag=web&source=xml&ip=10.0.0" \
   -H 'x-armadillo-user: jason' \
   -H 'x-armadillo-role: viewer'
+```
+
+Source policy admin API:
+```bash
+# list policies
+curl http://localhost:4000/api/v1/import-policies \
+  -H 'x-armadillo-user: jason' \
+  -H 'x-armadillo-role: viewer'
+
+# upsert policy (admin+)
+curl -X POST http://localhost:4000/api/v1/import-policies \
+  -H 'content-type: application/json' \
+  -H 'x-armadillo-user: jason' \
+  -H 'x-armadillo-role: admin' \
+  -d '{"source":"manual","defaultQualityMode":"strict","allowBypassToLenient":false,"enabled":true}'
 ```
 
 Backfill legacy assets missing identity keys (admin+):

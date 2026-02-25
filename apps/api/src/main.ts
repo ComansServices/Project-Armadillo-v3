@@ -4,6 +4,7 @@ import { scanQueue } from './queue';
 import { createScan, getScan, listScans, listScanEvents } from './store';
 import { createXmlImport, getImportQualityDigest, getXmlImport, listImportQualityTrend, listXmlImports } from './imports';
 import { backfillAssetIdentityKeys, getAsset, listAssets } from './assets';
+import { getSourcePolicy, listSourcePolicies, upsertSourcePolicy } from './policies';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
@@ -126,13 +127,39 @@ app.post('/api/v1/imports/xml', async (req, reply) => {
   if (!body?.xml || typeof body.xml !== 'string' || body.xml.trim().length === 0) {
     return reply.code(400).send({ error: 'xml payload is required' });
   }
+  if (!body?.source || typeof body.source !== 'string' || body.source.trim().length === 0) {
+    return reply.code(400).send({ error: 'source is required' });
+  }
+
+  const source = body.source.trim();
+  const policy = await getSourcePolicy(source);
+  if (!policy || !policy.enabled) {
+    return reply.code(403).send({ error: 'source_not_allowed', source });
+  }
+
+  const requestedMode = body.qualityMode;
+  const effectiveMode = requestedMode ?? (policy.defaultQualityMode as 'lenient' | 'strict');
+
+  if (
+    requestedMode === 'lenient' &&
+    policy.defaultQualityMode === 'strict' &&
+    !policy.allowBypassToLenient &&
+    actor.role !== 'admin' &&
+    actor.role !== 'owner'
+  ) {
+    return reply.code(403).send({
+      error: 'lenient_bypass_not_allowed',
+      source,
+      policyDefault: policy.defaultQualityMode
+    });
+  }
 
   try {
     const created = await createXmlImport({
       xml: body.xml,
-      source: body.source,
+      source,
       requestedBy: actor.actorId,
-      qualityMode: body.qualityMode
+      qualityMode: effectiveMode
     });
 
     app.log.info({ actorId: actor.actorId, importId: created.id, rootNode: created.rootNode }, 'xml import created');
@@ -258,6 +285,23 @@ app.get('/api/v1/imports.csv', async (req, reply) => {
   return lines.join('\n');
 });
 
+app.get('/api/v1/imports/:importId/reject-artifact', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { importId } = req.params as { importId: string };
+  const data = await getXmlImport(importId);
+  if (!data) {
+    return reply.code(404).send({ error: 'Import not found' });
+  }
+
+  return {
+    importId: data.id,
+    qualityStatus: data.qualityStatus,
+    rejectArtifact: data.rejectArtifact ?? { rejected: [], rejectedCount: 0 }
+  };
+});
+
 app.get('/api/v1/imports/:importId', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
@@ -269,6 +313,39 @@ app.get('/api/v1/imports/:importId', async (req, reply) => {
   }
 
   return data;
+});
+
+app.get('/api/v1/import-policies', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const rows = await listSourcePolicies();
+  return { policies: rows };
+});
+
+app.post('/api/v1/import-policies', async (req, reply) => {
+  const actor = requireRole(req, reply, 'admin');
+  if (!actor) return;
+
+  const body = req.body as {
+    source?: string;
+    enabled?: boolean;
+    defaultQualityMode?: 'lenient' | 'strict';
+    allowBypassToLenient?: boolean;
+  };
+
+  if (!body?.source || typeof body.source !== 'string' || body.source.trim().length === 0) {
+    return reply.code(400).send({ error: 'source is required' });
+  }
+
+  const saved = await upsertSourcePolicy({
+    source: body.source.trim(),
+    enabled: body.enabled,
+    defaultQualityMode: body.defaultQualityMode,
+    allowBypassToLenient: body.allowBypassToLenient
+  });
+
+  return saved;
 });
 
 app.get('/api/v1/assets', async (req, reply) => {
