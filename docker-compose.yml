@@ -19,7 +19,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    command: pnpm --filter @armadillo/api dev
+    command: sh -lc "pnpm --filter @armadillo/api prisma:push && pnpm --filter @armadillo/api dev"
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
