@@ -1,14 +1,47 @@
 import { randomUUID } from 'node:crypto';
-import Fastify from 'fastify';
+import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import { scanQueue } from './queue';
 import { createScan, getScan, listScans, listScanEvents } from './store';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
 
+type UserRole = 'owner' | 'admin' | 'staff' | 'viewer';
+const ROLE_ORDER: Record<UserRole, number> = {
+  viewer: 1,
+  staff: 2,
+  admin: 3,
+  owner: 4
+};
+
+function getActor(req: FastifyRequest) {
+  const actorId = String(req.headers['x-armadillo-user'] ?? 'anonymous');
+  const rawRole = String(req.headers['x-armadillo-role'] ?? 'viewer').toLowerCase();
+  const role: UserRole = ['owner', 'admin', 'staff', 'viewer'].includes(rawRole)
+    ? (rawRole as UserRole)
+    : 'viewer';
+  return { actorId, role };
+}
+
+function requireRole(req: FastifyRequest, reply: FastifyReply, minimumRole: UserRole) {
+  const actor = getActor(req);
+  if (ROLE_ORDER[actor.role] < ROLE_ORDER[minimumRole]) {
+    reply.code(403).send({
+      error: 'insufficient_role',
+      requiredRole: minimumRole,
+      actorRole: actor.role
+    });
+    return null;
+  }
+  return actor;
+}
+
 app.get('/health', async () => ({ ok: true, service: 'armadillo-api' }));
 
 app.post('/api/v1/scans', async (req, reply) => {
+  const actor = requireRole(req, reply, 'staff');
+  if (!actor) return;
+
   const body = req.body as ScanRequest;
 
   if (!body?.projectId || !body?.requestedBy || !Array.isArray(body?.targets) || body.targets.length === 0) {
@@ -36,26 +69,42 @@ app.post('/api/v1/scans', async (req, reply) => {
     removeOnFail: 100
   });
 
+  app.log.info({ actorId: actor.actorId, role: actor.role, scanId }, 'scan queued');
+
   return { scanId, status: 'queued' };
 });
 
-app.get('/api/v1/scans', async (req) => {
+app.get('/api/v1/scans', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
   const { limit } = req.query as { limit?: string };
   const parsedLimit = Math.min(Math.max(Number(limit ?? 25), 1), 100);
   const scans = await listScans(Number.isNaN(parsedLimit) ? 25 : parsedLimit);
+
+  app.log.info({ actorId: actor.actorId, role: actor.role, count: scans.length }, 'scan list viewed');
+
   return { scans };
 });
 
 app.get('/api/v1/scans/:scanId', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
   const { scanId } = req.params as { scanId: string };
   const scan = await getScan(scanId);
   if (!scan) {
     return reply.code(404).send({ error: 'Scan not found' });
   }
+
+  app.log.info({ actorId: actor.actorId, role: actor.role, scanId }, 'scan viewed');
   return scan;
 });
 
 app.get('/api/v1/scans/:scanId/events', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
   const { scanId } = req.params as { scanId: string };
   const scan = await getScan(scanId);
   if (!scan) {
@@ -63,6 +112,7 @@ app.get('/api/v1/scans/:scanId/events', async (req, reply) => {
   }
 
   const events = await listScanEvents(scanId, 200);
+  app.log.info({ actorId: actor.actorId, role: actor.role, scanId, count: events.length }, 'scan events viewed');
   return { events };
 });
 

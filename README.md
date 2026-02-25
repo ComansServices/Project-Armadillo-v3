@@ -42,10 +42,16 @@ pnpm --filter @armadillo/api prisma:migrate -- --name init_scans
 ```
 
 ## API sample
-Queue a scan:
+Role headers (auth scaffold):
+- `x-armadillo-user: <actor>`
+- `x-armadillo-role: owner|admin|staff|viewer`
+
+Queue a scan (staff+):
 ```bash
 curl -X POST http://localhost:4000/api/v1/scans \
   -H 'content-type: application/json' \
+  -H 'x-armadillo-user: jason' \
+  -H 'x-armadillo-role: staff' \
   -d '{
     "projectId": "proj-001",
     "requestedBy": "jason",
@@ -54,9 +60,11 @@ curl -X POST http://localhost:4000/api/v1/scans \
   }'
 ```
 
-Check status:
+Check status (viewer+):
 ```bash
-curl http://localhost:4000/api/v1/scans/<scanId>
+curl http://localhost:4000/api/v1/scans/<scanId> \
+  -H 'x-armadillo-user: jason' \
+  -H 'x-armadillo-role: viewer'
 ```
 
 ## Docs

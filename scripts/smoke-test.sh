@@ -17,6 +17,8 @@ done
 echo "[2/3] Queue scan"
 RESP=$(curl -fsS -X POST http://localhost:4000/api/v1/scans \
   -H 'content-type: application/json' \
+  -H 'x-armadillo-user: smoke-test' \
+  -H 'x-armadillo-role: staff' \
   -d '{
     "projectId":"proj-001",
     "requestedBy":"local-smoke",
@@ -33,7 +35,9 @@ PY
 
 echo "[3/3] Fetch status for ${SCAN_ID}"
 for i in {1..15}; do
-  curl -fsS "http://localhost:4000/api/v1/scans/${SCAN_ID}" | tee /tmp/armadillo_scan_status.json
+  curl -fsS "http://localhost:4000/api/v1/scans/${SCAN_ID}" \
+    -H 'x-armadillo-user: smoke-test' \
+    -H 'x-armadillo-role: viewer' | tee /tmp/armadillo_scan_status.json
   status=$(python3 - <<'PY' /tmp/armadillo_scan_status.json
 import json,sys
 with open(sys.argv[1]) as f:
