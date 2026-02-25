@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
 
 type XmlImportRecord = {
@@ -40,6 +41,11 @@ const authHeaders = {
   'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
 };
 
+const adminHeaders = {
+  'x-armadillo-user': process.env.WEB_ADMIN_ACTOR_ID ?? process.env.WEB_ACTOR_ID ?? 'web-admin',
+  'x-armadillo-role': process.env.WEB_ADMIN_ACTOR_ROLE ?? 'admin'
+};
+
 async function getImports(): Promise<XmlImportRecord[]> {
   const res = await fetch(`${baseUrl}/api/v1/imports?limit=50`, {
     cache: 'no-store',
@@ -70,6 +76,33 @@ async function getPolicies(): Promise<ImportPolicy[]> {
   return data.policies ?? [];
 }
 
+async function savePolicyAction(formData: FormData) {
+  'use server';
+
+  const source = String(formData.get('source') ?? '').trim();
+  const defaultQualityMode = String(formData.get('defaultQualityMode') ?? 'strict') as 'lenient' | 'strict';
+  const enabled = String(formData.get('enabled') ?? 'false') === 'true';
+  const allowBypassToLenient = String(formData.get('allowBypassToLenient') ?? 'false') === 'true';
+
+  if (!source) return;
+
+  await fetch(`${baseUrl}/api/v1/import-policies`, {
+    method: 'POST',
+    headers: {
+      ...adminHeaders,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      source,
+      enabled,
+      defaultQualityMode,
+      allowBypassToLenient
+    })
+  });
+
+  revalidatePath('/imports');
+}
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -95,40 +128,57 @@ export default async function ImportsPage() {
       <meta httpEquiv="refresh" content="5" />
 
       <h2 style={{ marginTop: 20, marginBottom: 8 }}>Import Source Policies</h2>
-      <div style={{ overflowX: 'auto', marginBottom: 18 }}>
-        <table style={{ borderCollapse: 'collapse', minWidth: 700, width: '100%' }}>
-          <thead>
-            <tr>
-              {['Source', 'Enabled', 'Default Mode', 'Lenient Bypass'].map((h) => (
-                <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {policies.length === 0 ? (
-              <tr>
-                <td colSpan={4} style={{ padding: '12px 10px', color: '#666' }}>
-                  No policies visible (viewer mode or none configured).
-                </td>
-              </tr>
-            ) : (
-              policies.map((p) => (
-                <tr key={p.source}>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{p.source}</td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{p.enabled ? 'yes' : 'no'}</td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', textTransform: 'uppercase' }}>
-                    {p.defaultQualityMode}
-                  </td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                    {p.allowBypassToLenient ? 'allowed' : 'blocked'}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div style={{ marginBottom: 18, display: 'grid', gap: 8 }}>
+        {policies.length === 0 ? (
+          <p style={{ color: '#666', margin: 0 }}>No policies visible (viewer mode or none configured).</p>
+        ) : (
+          policies.map((p) => (
+            <form
+              key={p.source}
+              action={savePolicyAction}
+              style={{
+                display: 'flex',
+                gap: 8,
+                alignItems: 'center',
+                border: '1px solid #eee',
+                borderRadius: 8,
+                padding: 10
+              }}
+            >
+              <input name="source" value={p.source} readOnly style={{ minWidth: 140 }} />
+              <select name="enabled" defaultValue={String(p.enabled)}>
+                <option value="true">enabled</option>
+                <option value="false">disabled</option>
+              </select>
+              <select name="defaultQualityMode" defaultValue={p.defaultQualityMode}>
+                <option value="strict">strict</option>
+                <option value="lenient">lenient</option>
+              </select>
+              <select name="allowBypassToLenient" defaultValue={String(p.allowBypassToLenient)}>
+                <option value="false">bypass blocked</option>
+                <option value="true">bypass allowed</option>
+              </select>
+              <button type="submit">Save</button>
+            </form>
+          ))
+        )}
+
+        <form action={savePolicyAction} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input name="source" placeholder="new-source" required />
+          <select name="enabled" defaultValue="true">
+            <option value="true">enabled</option>
+            <option value="false">disabled</option>
+          </select>
+          <select name="defaultQualityMode" defaultValue="strict">
+            <option value="strict">strict</option>
+            <option value="lenient">lenient</option>
+          </select>
+          <select name="allowBypassToLenient" defaultValue="false">
+            <option value="false">bypass blocked</option>
+            <option value="true">bypass allowed</option>
+          </select>
+          <button type="submit">Add policy</button>
+        </form>
       </div>
 
       <h2 style={{ marginTop: 20, marginBottom: 8 }}>Quality Trend (last 10 imports)</h2>
