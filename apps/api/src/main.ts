@@ -1,70 +1,55 @@
-import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
-import { NestFactory } from '@nestjs/core';
-import { Module, Controller, Get, Post, Param, Body, HttpException, HttpStatus } from '@nestjs/common';
+import Fastify from 'fastify';
 import { scanQueue } from './queue';
 import { createScan, getScan } from './store';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
-@Controller('/health')
-class HealthController {
-  @Get()
-  health() {
-    return { ok: true, service: 'armadillo-api' };
-  }
-}
+const app = Fastify({ logger: true });
 
-@Controller('/api/v1/scans')
-class ScanController {
-  @Post()
-  async create(@Body() body: ScanRequest) {
-    if (!body?.projectId || !body?.requestedBy || !Array.isArray(body?.targets) || body.targets.length === 0) {
-      throw new HttpException('Invalid scan request payload', HttpStatus.BAD_REQUEST);
-    }
+app.get('/health', async () => ({ ok: true, service: 'armadillo-api' }));
 
-    const scanId = randomUUID();
-    const now = new Date().toISOString();
-    createScan({
-      id: scanId,
-      projectId: body.projectId,
-      requestedBy: body.requestedBy,
-      status: 'queued',
-      createdAt: now,
-      updatedAt: now
-    });
+app.post('/api/v1/scans', async (req, reply) => {
+  const body = req.body as ScanRequest;
 
-    const firstJob: ScanJobPayload = {
-      scanId,
-      stage: 'naabu',
-      request: body
-    };
-
-    await scanQueue.add('scan-stage', firstJob, {
-      attempts: 2,
-      removeOnComplete: 100,
-      removeOnFail: 100
-    });
-
-    return { scanId, status: 'queued' };
+  if (!body?.projectId || !body?.requestedBy || !Array.isArray(body?.targets) || body.targets.length === 0) {
+    return reply.code(400).send({ error: 'Invalid scan request payload' });
   }
 
-  @Get(':scanId')
-  status(@Param('scanId') scanId: string) {
-    const scan = getScan(scanId);
-    if (!scan) {
-      throw new HttpException('Scan not found', HttpStatus.NOT_FOUND);
-    }
-    return scan;
+  const scanId = randomUUID();
+  const now = new Date().toISOString();
+  createScan({
+    id: scanId,
+    projectId: body.projectId,
+    requestedBy: body.requestedBy,
+    status: 'queued',
+    createdAt: now,
+    updatedAt: now
+  });
+
+  const firstJob: ScanJobPayload = {
+    scanId,
+    stage: 'naabu',
+    request: body
+  };
+
+  await scanQueue.add('scan-stage', firstJob, {
+    attempts: 2,
+    removeOnComplete: 100,
+    removeOnFail: 100
+  });
+
+  return { scanId, status: 'queued' };
+});
+
+app.get('/api/v1/scans/:scanId', async (req, reply) => {
+  const { scanId } = req.params as { scanId: string };
+  const scan = getScan(scanId);
+  if (!scan) {
+    return reply.code(404).send({ error: 'Scan not found' });
   }
-}
+  return scan;
+});
 
-@Module({ controllers: [HealthController, ScanController] })
-class AppModule {}
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(4000);
+app.listen({ host: '0.0.0.0', port: 4000 }).then(() => {
   console.log('API listening on http://localhost:4000');
-}
-
-bootstrap();
+});
