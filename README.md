@@ -80,6 +80,13 @@ curl http://localhost:4000/api/v1/assets?limit=20 \
   -H 'x-armadillo-role: viewer'
 ```
 
+Backfill legacy assets missing identity keys (admin+):
+```bash
+curl -X POST http://localhost:4000/api/v1/assets/backfill-identity \
+  -H 'x-armadillo-user: jason' \
+  -H 'x-armadillo-role: admin'
+```
+
 ## Docs
 - `docs/armadillo-v3-architecture.md`
 - `docs/armadillo-v3-roadmap-90d.md`

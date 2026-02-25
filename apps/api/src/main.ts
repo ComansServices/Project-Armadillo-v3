@@ -3,7 +3,7 @@ import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import { scanQueue } from './queue';
 import { createScan, getScan, listScans, listScanEvents } from './store';
 import { createXmlImport, getXmlImport, listXmlImports } from './imports';
-import { getAsset, listAssets } from './assets';
+import { backfillAssetIdentityKeys, getAsset, listAssets } from './assets';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
@@ -218,6 +218,15 @@ app.get('/api/v1/assets/:assetId', async (req, reply) => {
   }
 
   return asset;
+});
+
+app.post('/api/v1/assets/backfill-identity', async (req, reply) => {
+  const actor = requireRole(req, reply, 'admin');
+  if (!actor) return;
+
+  const result = await backfillAssetIdentityKeys();
+  app.log.info({ actorId: actor.actorId, ...result }, 'asset identity backfill complete');
+  return result;
 });
 
 app.listen({ host: '0.0.0.0', port: 4000 }).then(() => {

@@ -52,7 +52,7 @@ done
 
 echo
 
-echo "[4/4] XML import smoke"
+echo "[4/5] XML import smoke"
 XML_RESP=$(curl -fsS -X POST http://localhost:4000/api/v1/imports/xml \
   -H 'content-type: application/json' \
   -H 'x-armadillo-user: smoke-test' \
