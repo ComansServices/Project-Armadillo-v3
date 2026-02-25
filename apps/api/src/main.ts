@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import { scanQueue } from './queue';
-import { createScan, getScan } from './store';
+import { createScan, getScan, listScans } from './store';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
@@ -37,6 +37,13 @@ app.post('/api/v1/scans', async (req, reply) => {
   });
 
   return { scanId, status: 'queued' };
+});
+
+app.get('/api/v1/scans', async (req) => {
+  const { limit } = req.query as { limit?: string };
+  const parsedLimit = Math.min(Math.max(Number(limit ?? 25), 1), 100);
+  const scans = await listScans(Number.isNaN(parsedLimit) ? 25 : parsedLimit);
+  return { scans };
 });
 
 app.get('/api/v1/scans/:scanId', async (req, reply) => {

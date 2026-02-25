@@ -68,6 +68,15 @@ export async function getScan(id: string) {
   return scan ? toScanRecord(scan) : null;
 }
 
+export async function listScans(limit = 25) {
+  const scans = await prisma.scan.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limit
+  });
+
+  return scans.map(toScanRecord);
+}
+
 export async function updateScan(id: string, patch: Partial<ScanRecord>) {
   const existing = await prisma.scan.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return null;
