@@ -45,14 +45,31 @@ model ScanEvent {
 }
 
 model XmlImport {
-  id           String   @id
+  id           String    @id
   source       String?
   requestedBy  String
   rootNode     String?
-  itemCount    Int      @default(0)
+  itemCount    Int       @default(0)
   payload      Json
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
+  assets       Asset[]
 
   @@index([createdAt])
   @@map("xml_imports")
+}
+
+model Asset {
+  id         String   @id
+  importId   String
+  ip         String?
+  hostname   String?
+  raw        Json
+  createdAt  DateTime @default(now())
+
+  xmlImport  XmlImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@index([importId, createdAt])
+  @@index([ip])
+  @@index([hostname])
+  @@map("assets")
 }

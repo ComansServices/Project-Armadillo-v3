@@ -44,6 +44,9 @@ export default async function ImportsPage() {
       </p>
       <h1 style={{ marginBottom: 8 }}>XML Imports</h1>
       <p style={{ marginTop: 0 }}>Latest imported XML payloads (auto-refresh every 5s).</p>
+      <p style={{ marginTop: 0 }}>
+        <Link href="/assets">View normalized assets →</Link>
+      </p>
 
       <meta httpEquiv="refresh" content="5" />
 

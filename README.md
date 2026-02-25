@@ -67,6 +67,19 @@ curl http://localhost:4000/api/v1/scans/<scanId> \
   -H 'x-armadillo-role: viewer'
 ```
 
+Import XML and read normalized assets:
+```bash
+curl -X POST http://localhost:4000/api/v1/imports/xml \
+  -H 'content-type: application/json' \
+  -H 'x-armadillo-user: jason' \
+  -H 'x-armadillo-role: staff' \
+  -d '{"source":"manual","xml":"<assets><asset><ip>10.0.0.1</ip><hostname>srv-1</hostname></asset></assets>"}'
+
+curl http://localhost:4000/api/v1/assets?limit=20 \
+  -H 'x-armadillo-user: jason' \
+  -H 'x-armadillo-role: viewer'
+```
+
 ## Docs
 - `docs/armadillo-v3-architecture.md`
 - `docs/armadillo-v3-roadmap-90d.md`

@@ -70,6 +70,13 @@ curl -fsS "http://localhost:4000/api/v1/imports?limit=5" \
 
 echo
 
+echo "[5/5] Normalized assets smoke"
+curl -fsS "http://localhost:4000/api/v1/assets?limit=5" \
+  -H 'x-armadillo-user: smoke-test' \
+  -H 'x-armadillo-role: viewer' | tee /tmp/armadillo_assets_list.json
+
+echo
+
 echo "Worker tail:"
 docker logs --tail 20 project-armadillo-v3-worker-1 || true
 

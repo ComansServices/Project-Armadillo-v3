@@ -3,6 +3,7 @@ import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import { scanQueue } from './queue';
 import { createScan, getScan, listScans, listScanEvents } from './store';
 import { createXmlImport, getXmlImport, listXmlImports } from './imports';
+import { getAsset, listAssets } from './assets';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
@@ -139,6 +140,7 @@ app.post('/api/v1/imports/xml', async (req, reply) => {
       importId: created.id,
       rootNode: created.rootNode,
       itemCount: created.itemCount,
+      normalizedAssetCount: created.normalizedAssetCount,
       createdAt: created.createdAt
     };
   } catch (err) {
@@ -178,6 +180,38 @@ app.get('/api/v1/imports/:importId', async (req, reply) => {
   }
 
   return data;
+});
+
+app.get('/api/v1/assets', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { limit } = req.query as { limit?: string };
+  const parsedLimit = Math.min(Math.max(Number(limit ?? 50), 1), 200);
+  const assets = await listAssets(Number.isNaN(parsedLimit) ? 50 : parsedLimit);
+
+  return {
+    assets: assets.map((a) => ({
+      id: a.id,
+      importId: a.importId,
+      ip: a.ip,
+      hostname: a.hostname,
+      createdAt: a.createdAt
+    }))
+  };
+});
+
+app.get('/api/v1/assets/:assetId', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { assetId } = req.params as { assetId: string };
+  const asset = await getAsset(assetId);
+  if (!asset) {
+    return reply.code(404).send({ error: 'Asset not found' });
+  }
+
+  return asset;
 });
 
 app.listen({ host: '0.0.0.0', port: 4000 }).then(() => {
