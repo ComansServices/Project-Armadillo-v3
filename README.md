@@ -11,10 +11,18 @@ Modern, queue-driven network discovery and security visibility platform.
 ## Pipeline (v1 practical combo)
 `naabu -> nmap -> httpx -> nuclei`
 
-## Quick Start
+## Quick Start (one command)
 ```bash
-pnpm install
-pnpm dev
+docker compose up --build
+```
+
+### Local URLs
+- Web: <http://localhost:3000>
+- API health: <http://localhost:4000/health>
+
+### Stop
+```bash
+docker compose down
 ```
 
 ## API sample
