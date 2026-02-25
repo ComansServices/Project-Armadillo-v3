@@ -12,7 +12,19 @@ type AssetCandidate = {
   identityKey: string;
   ip?: string;
   hostname?: string;
+  os?: string;
+  ports: number[];
+  serviceTags: string[];
+  sourceType: string;
   raw: object;
+};
+
+type NormalizationStats = {
+  parsedObjects: number;
+  normalizedAssetCount: number;
+  skippedAssetCount: number;
+  invalidAssetCount: number;
+  reasonBuckets: Record<string, number>;
 };
 
 const parser = new XMLParser({
@@ -48,16 +60,57 @@ function collectObjects(node: unknown, out: object[] = []): object[] {
   return out;
 }
 
-function normalizeAssetCandidates(parsed: Record<string, unknown>): AssetCandidate[] {
+function toStringArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.flatMap((x) => (typeof x === 'string' ? [x.trim()] : [])).filter(Boolean);
+  if (typeof v === 'string' && v.trim().length > 0) return [v.trim()];
+  return [];
+}
+
+function toNumberArray(v: unknown): number[] {
+  if (Array.isArray(v)) {
+    return v
+      .map((x) => Number(x))
+      .filter((x) => Number.isFinite(x) && x > 0 && x <= 65535)
+      .map((x) => Math.trunc(x));
+  }
+  if (typeof v === 'string') {
+    return v
+      .split(',')
+      .map((x) => Number(x.trim()))
+      .filter((x) => Number.isFinite(x) && x > 0 && x <= 65535)
+      .map((x) => Math.trunc(x));
+  }
+  if (typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 65535) return [Math.trunc(v)];
+  return [];
+}
+
+function normalizeAssetCandidates(parsed: Record<string, unknown>): { assets: AssetCandidate[]; stats: NormalizationStats } {
   const objects = collectObjects(parsed);
   const dedup = new Map<string, AssetCandidate>();
+  const reasonBuckets: Record<string, number> = {};
+
+  let skipped = 0;
+  let invalid = 0;
 
   for (const obj of objects) {
     const record = obj as Record<string, unknown>;
     const ip = typeof record.ip === 'string' ? record.ip.trim() : undefined;
     const hostname = typeof record.hostname === 'string' ? record.hostname.trim() : undefined;
 
-    if (!ip && !hostname) continue;
+    if (!ip && !hostname) {
+      skipped += 1;
+      reasonBuckets['missing_identity'] = (reasonBuckets['missing_identity'] ?? 0) + 1;
+      continue;
+    }
+
+    const ports = toNumberArray(record.ports ?? record.port);
+    const serviceTags = toStringArray(record.serviceTags ?? record.tags ?? record.service);
+    const os = typeof record.os === 'string' ? record.os.trim() : undefined;
+
+    if ((record.port !== undefined || record.ports !== undefined) && ports.length === 0) {
+      invalid += 1;
+      reasonBuckets['invalid_ports'] = (reasonBuckets['invalid_ports'] ?? 0) + 1;
+    }
 
     const identityKey = ip && ip.length > 0 ? `ip:${ip}` : `host:${(hostname ?? '').toLowerCase()}`;
     if (!dedup.has(identityKey)) {
@@ -65,19 +118,32 @@ function normalizeAssetCandidates(parsed: Record<string, unknown>): AssetCandida
         identityKey,
         ip: ip && ip.length > 0 ? ip : undefined,
         hostname: hostname && hostname.length > 0 ? hostname : undefined,
+        os: os && os.length > 0 ? os : undefined,
+        ports: [...new Set(ports)],
+        serviceTags: [...new Set(serviceTags)],
+        sourceType: 'xml',
         raw: record
       });
     }
   }
 
-  return [...dedup.values()];
+  return {
+    assets: [...dedup.values()],
+    stats: {
+      parsedObjects: objects.length,
+      normalizedAssetCount: dedup.size,
+      skippedAssetCount: skipped,
+      invalidAssetCount: invalid,
+      reasonBuckets
+    }
+  };
 }
 
 export async function createXmlImport(input: XmlImportInput) {
   const parsed = parser.parse(input.xml) as Record<string, unknown>;
   const rootNode = Object.keys(parsed)[0] ?? null;
   const itemCount = estimateItemCount(parsed);
-  const assets = normalizeAssetCandidates(parsed);
+  const { assets, stats } = normalizeAssetCandidates(parsed);
   const importId = randomUUID();
 
   const created = await prisma.$transaction(async (tx) => {
@@ -88,6 +154,10 @@ export async function createXmlImport(input: XmlImportInput) {
         requestedBy: input.requestedBy,
         rootNode,
         itemCount,
+        normalizedAssetCount: stats.normalizedAssetCount,
+        skippedAssetCount: stats.skippedAssetCount,
+        invalidAssetCount: stats.invalidAssetCount,
+        qualitySummary: stats,
         payload: parsed as object
       }
     });
@@ -106,6 +176,10 @@ export async function createXmlImport(input: XmlImportInput) {
           importId,
           ip: a.ip ?? null,
           hostname: a.hostname ?? null,
+          os: a.os ?? null,
+          ports: a.ports,
+          serviceTags: a.serviceTags,
+          sourceType: a.sourceType,
           raw: a.raw,
           seenCount: 1
         },
@@ -113,6 +187,10 @@ export async function createXmlImport(input: XmlImportInput) {
           importId,
           ip: a.ip ?? exists?.ip ?? null,
           hostname: a.hostname ?? exists?.hostname ?? null,
+          os: a.os ?? exists?.os ?? null,
+          ports: a.ports.length > 0 ? a.ports : exists?.ports ?? [],
+          serviceTags: a.serviceTags.length > 0 ? a.serviceTags : exists?.serviceTags ?? [],
+          sourceType: a.sourceType,
           raw: a.raw,
           seenCount: { increment: 1 },
           lastSeenAt: new Date()
@@ -127,7 +205,10 @@ export async function createXmlImport(input: XmlImportInput) {
       ...saved,
       normalizedAssetCount: assets.length,
       createdAssetCount: createdAssets,
-      updatedAssetCount: updatedAssets
+      updatedAssetCount: updatedAssets,
+      skippedAssetCount: stats.skippedAssetCount,
+      invalidAssetCount: stats.invalidAssetCount,
+      qualitySummary: stats
     };
   });
 

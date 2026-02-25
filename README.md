@@ -78,6 +78,10 @@ curl -X POST http://localhost:4000/api/v1/imports/xml \
 curl http://localhost:4000/api/v1/assets?limit=20 \
   -H 'x-armadillo-user: jason' \
   -H 'x-armadillo-role: viewer'
+
+curl "http://localhost:4000/api/v1/assets?tag=web&source=xml&ip=10.0.0" \
+  -H 'x-armadillo-user: jason' \
+  -H 'x-armadillo-role: viewer'
 ```
 
 Backfill legacy assets missing identity keys (admin+):

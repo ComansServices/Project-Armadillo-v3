@@ -7,8 +7,21 @@ function deriveIdentityKey(ip: string | null, hostname: string | null): string |
   return null;
 }
 
-export async function listAssets(limit = 50) {
+export type ListAssetFilters = {
+  ip?: string;
+  hostname?: string;
+  tag?: string;
+  source?: string;
+};
+
+export async function listAssets(limit = 50, filters: ListAssetFilters = {}) {
   return prisma.asset.findMany({
+    where: {
+      ip: filters.ip ? { contains: filters.ip, mode: 'insensitive' } : undefined,
+      hostname: filters.hostname ? { contains: filters.hostname, mode: 'insensitive' } : undefined,
+      sourceType: filters.source ? { equals: filters.source, mode: 'insensitive' } : undefined,
+      serviceTags: filters.tag ? { has: filters.tag } : undefined
+    },
     orderBy: { createdAt: 'desc' },
     take: limit
   });

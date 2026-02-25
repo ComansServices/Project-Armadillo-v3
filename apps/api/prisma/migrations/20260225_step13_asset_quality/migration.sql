@@ -1,0 +1,13 @@
+-- AlterTable
+ALTER TABLE "xml_imports"
+  ADD COLUMN "normalizedAssetCount" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "skippedAssetCount" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "invalidAssetCount" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "qualitySummary" JSONB;
+
+-- AlterTable
+ALTER TABLE "assets"
+  ADD COLUMN "os" TEXT,
+  ADD COLUMN "ports" INTEGER[] NOT NULL DEFAULT ARRAY[]::INTEGER[],
+  ADD COLUMN "serviceTags" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  ADD COLUMN "sourceType" TEXT NOT NULL DEFAULT 'xml';

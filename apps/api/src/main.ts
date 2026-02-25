@@ -143,6 +143,9 @@ app.post('/api/v1/imports/xml', async (req, reply) => {
       normalizedAssetCount: created.normalizedAssetCount,
       createdAssetCount: created.createdAssetCount,
       updatedAssetCount: created.updatedAssetCount,
+      skippedAssetCount: created.skippedAssetCount,
+      invalidAssetCount: created.invalidAssetCount,
+      qualitySummary: created.qualitySummary,
       createdAt: created.createdAt
     };
   } catch (err) {
@@ -166,6 +169,9 @@ app.get('/api/v1/imports', async (req, reply) => {
       requestedBy: i.requestedBy,
       rootNode: i.rootNode,
       itemCount: i.itemCount,
+      normalizedAssetCount: i.normalizedAssetCount,
+      skippedAssetCount: i.skippedAssetCount,
+      invalidAssetCount: i.invalidAssetCount,
       createdAt: i.createdAt
     }))
   };
@@ -188,9 +194,20 @@ app.get('/api/v1/assets', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
 
-  const { limit } = req.query as { limit?: string };
+  const { limit, ip, hostname, tag, source } = req.query as {
+    limit?: string;
+    ip?: string;
+    hostname?: string;
+    tag?: string;
+    source?: string;
+  };
   const parsedLimit = Math.min(Math.max(Number(limit ?? 50), 1), 200);
-  const assets = await listAssets(Number.isNaN(parsedLimit) ? 50 : parsedLimit);
+  const assets = await listAssets(Number.isNaN(parsedLimit) ? 50 : parsedLimit, {
+    ip,
+    hostname,
+    tag,
+    source
+  });
 
   return {
     assets: assets.map((a) => ({
@@ -199,6 +216,10 @@ app.get('/api/v1/assets', async (req, reply) => {
       importId: a.importId,
       ip: a.ip,
       hostname: a.hostname,
+      os: a.os,
+      ports: a.ports,
+      serviceTags: a.serviceTags,
+      sourceType: a.sourceType,
       seenCount: a.seenCount,
       firstSeenAt: a.firstSeenAt,
       lastSeenAt: a.lastSeenAt,

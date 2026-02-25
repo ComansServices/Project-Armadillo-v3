@@ -59,7 +59,7 @@ XML_RESP=$(curl -fsS -X POST http://localhost:4000/api/v1/imports/xml \
   -H 'x-armadillo-role: staff' \
   -d '{
     "source":"smoke-test",
-    "xml":"<assets><asset><ip>10.0.0.1</ip></asset><asset><ip>10.0.0.2</ip></asset></assets>"
+    "xml":"<assets><asset><ip>10.0.0.1</ip><ports>443,8443</ports><serviceTags>web</serviceTags></asset><asset><ip>10.0.0.2</ip><port>22</port><tags>ssh</tags></asset><asset><hostname>bad-port-host</hostname><port>abc</port></asset></assets>"
   }')
 
 echo "$XML_RESP" | tee /tmp/armadillo_import_create.json
@@ -74,6 +74,10 @@ echo "[5/5] Normalized assets smoke"
 curl -fsS "http://localhost:4000/api/v1/assets?limit=5" \
   -H 'x-armadillo-user: smoke-test' \
   -H 'x-armadillo-role: viewer' | tee /tmp/armadillo_assets_list.json
+
+curl -fsS "http://localhost:4000/api/v1/assets?tag=web&source=xml&limit=5" \
+  -H 'x-armadillo-user: smoke-test' \
+  -H 'x-armadillo-role: viewer' | tee /tmp/armadillo_assets_filtered.json
 
 echo
 
