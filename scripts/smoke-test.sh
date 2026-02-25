@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[1/3] API health"
+echo "[1/5] API health"
 for i in {1..30}; do
   if curl -fsS http://localhost:4000/health > /tmp/armadillo_health.json; then
     cat /tmp/armadillo_health.json
@@ -14,7 +14,7 @@ for i in {1..30}; do
   fi
 done
 
-echo "[2/3] Queue scan"
+echo "[2/5] Queue scan"
 RESP=$(curl -fsS -X POST http://localhost:4000/api/v1/scans \
   -H 'content-type: application/json' \
   -H 'x-armadillo-user: smoke-test' \
@@ -33,7 +33,7 @@ print(json.loads(sys.argv[1])["scanId"])
 PY
 )
 
-echo "[3/3] Fetch status for ${SCAN_ID}"
+echo "[3/5] Fetch status for ${SCAN_ID}"
 for i in {1..15}; do
   curl -fsS "http://localhost:4000/api/v1/scans/${SCAN_ID}" \
     -H 'x-armadillo-user: smoke-test' \

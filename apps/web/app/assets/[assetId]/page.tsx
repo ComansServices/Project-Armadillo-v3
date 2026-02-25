@@ -2,9 +2,13 @@ import Link from 'next/link';
 
 type AssetDetail = {
   id: string;
+  identityKey: string;
   importId: string;
   ip: string | null;
   hostname: string | null;
+  seenCount: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
   raw: unknown;
   createdAt: string;
 };
@@ -48,8 +52,11 @@ export default async function AssetDetailPage({ params }: { params: { assetId: s
       </p>
 
       <div style={{ marginTop: 12, marginBottom: 20 }}>
+        <strong>Identity:</strong> {data.identityKey} &nbsp; | &nbsp;
         <strong>IP:</strong> {data.ip ?? '-'} &nbsp; | &nbsp;
-        <strong>Hostname:</strong> {data.hostname ?? '-'}
+        <strong>Hostname:</strong> {data.hostname ?? '-'} &nbsp; | &nbsp;
+        <strong>Seen:</strong> {data.seenCount} &nbsp; | &nbsp;
+        <strong>Last Seen:</strong> {new Date(data.lastSeenAt).toLocaleString()}
       </div>
 
       <h2 style={{ marginBottom: 8 }}>Raw Asset Node</h2>

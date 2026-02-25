@@ -2,9 +2,13 @@ import Link from 'next/link';
 
 type AssetRecord = {
   id: string;
+  identityKey: string;
   importId: string;
   ip: string | null;
   hostname: string | null;
+  seenCount: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
   createdAt: string;
 };
 
@@ -50,7 +54,7 @@ export default async function AssetsPage() {
         <table style={{ borderCollapse: 'collapse', minWidth: 900, width: '100%' }}>
           <thead>
             <tr>
-              {['Asset ID', 'IP', 'Hostname', 'Import ID', 'Created'].map((h) => (
+              {['Asset ID', 'Identity Key', 'IP', 'Hostname', 'Seen', 'Last Seen', 'Import ID'].map((h) => (
                 <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
                   {h}
                 </th>
@@ -60,7 +64,7 @@ export default async function AssetsPage() {
           <tbody>
             {assets.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ padding: '12px 10px', color: '#666' }}>No normalized assets yet.</td>
+                <td colSpan={7} style={{ padding: '12px 10px', color: '#666' }}>No normalized assets yet.</td>
               </tr>
             ) : (
               assets.map((a) => (
@@ -68,13 +72,17 @@ export default async function AssetsPage() {
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>
                     <Link href={`/assets/${a.id}`}>{a.id}</Link>
                   </td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>
+                    {a.identityKey}
+                  </td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.ip ?? '-'}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.hostname ?? '-'}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.seenCount}</td>
+                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
+                    {new Date(a.lastSeenAt).toLocaleString()}
+                  </td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>
                     <Link href={`/imports/${a.importId}`}>{a.importId}</Link>
-                  </td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                    {new Date(a.createdAt).toLocaleString()}
                   </td>
                 </tr>
               ))

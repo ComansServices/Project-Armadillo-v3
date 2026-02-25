@@ -9,6 +9,7 @@ export interface XmlImportInput {
 }
 
 type AssetCandidate = {
+  identityKey: string;
   ip?: string;
   hostname?: string;
   raw: object;
@@ -49,7 +50,7 @@ function collectObjects(node: unknown, out: object[] = []): object[] {
 
 function normalizeAssetCandidates(parsed: Record<string, unknown>): AssetCandidate[] {
   const objects = collectObjects(parsed);
-  const candidates: AssetCandidate[] = [];
+  const dedup = new Map<string, AssetCandidate>();
 
   for (const obj of objects) {
     const record = obj as Record<string, unknown>;
@@ -58,14 +59,18 @@ function normalizeAssetCandidates(parsed: Record<string, unknown>): AssetCandida
 
     if (!ip && !hostname) continue;
 
-    candidates.push({
-      ip: ip && ip.length > 0 ? ip : undefined,
-      hostname: hostname && hostname.length > 0 ? hostname : undefined,
-      raw: record
-    });
+    const identityKey = ip && ip.length > 0 ? `ip:${ip}` : `host:${(hostname ?? '').toLowerCase()}`;
+    if (!dedup.has(identityKey)) {
+      dedup.set(identityKey, {
+        identityKey,
+        ip: ip && ip.length > 0 ? ip : undefined,
+        hostname: hostname && hostname.length > 0 ? hostname : undefined,
+        raw: record
+      });
+    }
   }
 
-  return candidates;
+  return [...dedup.values()];
 }
 
 export async function createXmlImport(input: XmlImportInput) {
@@ -87,25 +92,46 @@ export async function createXmlImport(input: XmlImportInput) {
       }
     });
 
-    if (assets.length > 0) {
-      await tx.asset.createMany({
-        data: assets.map((a) => ({
+    let createdAssets = 0;
+    let updatedAssets = 0;
+
+    for (const a of assets) {
+      const exists = await tx.asset.findUnique({ where: { identityKey: a.identityKey } });
+
+      await tx.asset.upsert({
+        where: { identityKey: a.identityKey },
+        create: {
           id: randomUUID(),
+          identityKey: a.identityKey,
           importId,
           ip: a.ip ?? null,
           hostname: a.hostname ?? null,
-          raw: a.raw
-        }))
+          raw: a.raw,
+          seenCount: 1
+        },
+        update: {
+          importId,
+          ip: a.ip ?? exists?.ip ?? null,
+          hostname: a.hostname ?? exists?.hostname ?? null,
+          raw: a.raw,
+          seenCount: { increment: 1 },
+          lastSeenAt: new Date()
+        }
       });
+
+      if (exists) updatedAssets += 1;
+      else createdAssets += 1;
     }
 
-    return saved;
+    return {
+      ...saved,
+      normalizedAssetCount: assets.length,
+      createdAssetCount: createdAssets,
+      updatedAssetCount: updatedAssets
+    };
   });
 
-  return {
-    ...created,
-    normalizedAssetCount: assets.length
-  };
+  return created;
 }
 
 export async function listXmlImports(limit = 25) {

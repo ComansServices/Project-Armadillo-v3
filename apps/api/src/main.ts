@@ -141,6 +141,8 @@ app.post('/api/v1/imports/xml', async (req, reply) => {
       rootNode: created.rootNode,
       itemCount: created.itemCount,
       normalizedAssetCount: created.normalizedAssetCount,
+      createdAssetCount: created.createdAssetCount,
+      updatedAssetCount: created.updatedAssetCount,
       createdAt: created.createdAt
     };
   } catch (err) {
@@ -193,9 +195,13 @@ app.get('/api/v1/assets', async (req, reply) => {
   return {
     assets: assets.map((a) => ({
       id: a.id,
+      identityKey: a.identityKey,
       importId: a.importId,
       ip: a.ip,
       hostname: a.hostname,
+      seenCount: a.seenCount,
+      firstSeenAt: a.firstSeenAt,
+      lastSeenAt: a.lastSeenAt,
       createdAt: a.createdAt
     }))
   };
