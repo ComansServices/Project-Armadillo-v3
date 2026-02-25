@@ -2,11 +2,41 @@
 
 Modern, queue-driven network discovery and security visibility platform.
 
-## Current scaffold includes
-- Next.js web shell (`apps/web`)
-- NestJS API with scan enqueue/status endpoints (`apps/api`)
-- BullMQ worker with staged pipeline stubs (`apps/worker`)
+## Current platform includes
+- Next.js web app (`apps/web`)
+- Fastify API (`apps/api`)
+- BullMQ worker pipeline (`apps/worker`)
 - Shared pipeline contracts (`packages/types`)
+- PostgreSQL + Prisma migrations (`apps/api/prisma`)
+
+## Progress snapshot (as of 2026-02-25, end of day)
+Implemented through **Step 20**:
+- ✅ Scan queue + status + event timeline (`/api/v1/scans`, `/api/v1/scans/:scanId/events`)
+- ✅ XML import pipeline (`POST /api/v1/imports/xml`) with strict/lenient quality modes
+- ✅ Import analytics:
+  - `GET /api/v1/imports`
+  - `GET /api/v1/imports/:importId`
+  - `GET /api/v1/imports.csv`
+  - `GET /api/v1/imports/quality-trend`
+  - `GET /api/v1/imports/quality-digest`
+  - `GET /api/v1/imports/:importId/reject-artifact`
+- ✅ Asset normalization + dedup by deterministic `identityKey`
+- ✅ Identity backfill + preflight enforcement (`POST /api/v1/assets/backfill-identity`)
+- ✅ Migration-hardening startup flow (`migrate deploy`, no `db push`)
+- ✅ Source policy governance:
+  - `GET /api/v1/import-policies`
+  - `POST /api/v1/import-policies` (admin+)
+  - source-required ingest enforcement + strict-source lenient bypass guard
+- ✅ Imports UI upgrades:
+  - quality panels/trend/CSV export
+  - policy visibility + admin editor
+  - role-aware read-only mode + save success/error feedback
+
+### Current stop point
+- Next planned dev pickup: **Step 21 / Phase 1**
+  - asset/import annotations (labels + notes)
+  - import/scan diff endpoint + UI
+- Dev stack has been intentionally brought down for overnight break (`make down`).
 
 ## Pipeline (v1 practical combo)
 `naabu -> nmap -> httpx -> nuclei`
