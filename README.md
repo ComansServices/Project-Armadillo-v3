@@ -35,6 +35,12 @@ make bootstrap
 colima start
 ```
 
+### Database setup (API)
+```bash
+pnpm --filter @armadillo/api prisma:generate
+pnpm --filter @armadillo/api prisma:migrate -- --name init_scans
+```
+
 ## API sample
 Queue a scan:
 ```bash

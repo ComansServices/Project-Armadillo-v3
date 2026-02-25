@@ -16,14 +16,12 @@ app.post('/api/v1/scans', async (req, reply) => {
   }
 
   const scanId = randomUUID();
-  const now = new Date().toISOString();
-  createScan({
+  await createScan({
     id: scanId,
     projectId: body.projectId,
     requestedBy: body.requestedBy,
     status: 'queued',
-    createdAt: now,
-    updatedAt: now
+    request: body
   });
 
   const firstJob: ScanJobPayload = {
@@ -43,7 +41,7 @@ app.post('/api/v1/scans', async (req, reply) => {
 
 app.get('/api/v1/scans/:scanId', async (req, reply) => {
   const { scanId } = req.params as { scanId: string };
-  const scan = getScan(scanId);
+  const scan = await getScan(scanId);
   if (!scan) {
     return reply.code(404).send({ error: 'Scan not found' });
   }
