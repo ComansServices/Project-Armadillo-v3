@@ -1,5 +1,6 @@
 import { Queue, Worker } from 'bullmq';
 import { SCAN_QUEUE_NAME } from '../../api/src/queue';
+import { updateScan } from '../../api/src/store';
 import type { ScanJobPayload } from '@armadillo/types/src/pipeline';
 import { nextStage, runStage } from './stages';
 
@@ -14,11 +15,21 @@ const worker = new Worker<ScanJobPayload>(
   SCAN_QUEUE_NAME,
   async (job) => {
     const payload = job.data;
+
+    await updateScan(payload.scanId, {
+      status: 'running',
+      request: payload.request
+    });
+
     const result = await runStage(payload);
 
     console.log(`[worker] stage=${payload.stage} scanId=${payload.scanId} ok=${result.ok}`);
 
     if (!result.ok) {
+      await updateScan(payload.scanId, {
+        status: 'failed',
+        request: payload.request
+      });
       throw new Error(result.error ?? `Stage ${payload.stage} failed`);
     }
 
@@ -31,6 +42,10 @@ const worker = new Worker<ScanJobPayload>(
         upstreamArtifactId: result.artifactRef
       });
     } else {
+      await updateScan(payload.scanId, {
+        status: 'completed',
+        request: payload.request
+      });
       console.log(`[worker] pipeline complete scanId=${payload.scanId}`);
     }
 
@@ -40,6 +55,12 @@ const worker = new Worker<ScanJobPayload>(
 );
 
 worker.on('completed', (job) => console.log(`[worker] completed job=${job.id}`));
-worker.on('failed', (job, err) => console.error(`[worker] failed job=${job?.id} err=${err.message}`));
+worker.on('failed', async (job, err) => {
+  console.error(`[worker] failed job=${job?.id} err=${err.message}`);
+  const scanId = job?.data?.scanId;
+  if (scanId) {
+    await updateScan(scanId, { status: 'failed' });
+  }
+});
 
 console.log('[worker] Armadillo pipeline worker running...');
