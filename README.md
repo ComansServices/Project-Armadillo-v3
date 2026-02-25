@@ -87,10 +87,11 @@ curl -X POST http://localhost:4000/api/v1/assets/backfill-identity \
   -H 'x-armadillo-role: admin'
 ```
 
-Step-11 startup hardening:
-- API startup now runs `assets:enforce-identity` preflight before `prisma db push`.
+Step-11/12 startup hardening:
+- API startup runs `assets:enforce-identity` preflight before migrations.
 - Preflight writes an audit report to `apps/api/prisma/reports/asset-identity-enforcement.json` in the API runtime.
-- `--accept-data-loss` has been removed from compose startup path.
+- Startup now uses `prisma migrate deploy` (via `prisma:migrate:startup`) instead of `prisma db push`.
+- Baseline migration path added for existing non-empty dev DBs (`20260225_step12_baseline`).
 
 ## Docs
 - `docs/armadillo-v3-architecture.md`

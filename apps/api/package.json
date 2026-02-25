@@ -10,6 +10,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:push": "prisma db push",
+    "prisma:migrate:startup": "sh ./scripts/migrate-startup.sh",
     "assets:enforce-identity": "tsx src/scripts/enforce-asset-identity.ts",
     "postinstall": "prisma generate"
   },
