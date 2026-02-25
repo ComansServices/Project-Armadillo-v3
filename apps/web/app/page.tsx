@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 type ScanRecord = {
   id: string;
   projectId: string;
@@ -61,7 +63,7 @@ export default async function HomePage() {
               scans.map((s) => (
                 <tr key={s.id}>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>
-                    {s.id}
+                    <Link href={`/scans/${s.id}`}>{s.id}</Link>
                   </td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.projectId}</td>
                   <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.requestedBy}</td>

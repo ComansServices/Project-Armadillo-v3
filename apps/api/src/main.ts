@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import { scanQueue } from './queue';
-import { createScan, getScan, listScans } from './store';
+import { createScan, getScan, listScans, listScanEvents } from './store';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
@@ -53,6 +53,17 @@ app.get('/api/v1/scans/:scanId', async (req, reply) => {
     return reply.code(404).send({ error: 'Scan not found' });
   }
   return scan;
+});
+
+app.get('/api/v1/scans/:scanId/events', async (req, reply) => {
+  const { scanId } = req.params as { scanId: string };
+  const scan = await getScan(scanId);
+  if (!scan) {
+    return reply.code(404).send({ error: 'Scan not found' });
+  }
+
+  const events = await listScanEvents(scanId, 200);
+  return { events };
 });
 
 app.listen({ host: '0.0.0.0', port: 4000 }).then(() => {

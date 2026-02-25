@@ -16,20 +16,36 @@ const worker = new Worker<ScanJobPayload>(
   async (job) => {
     const payload = job.data;
 
-    await updateScan(payload.scanId, {
-      status: 'running',
-      request: payload.request
-    });
+    await updateScan(
+      payload.scanId,
+      {
+        status: 'running',
+        request: payload.request
+      },
+      {
+        status: 'running',
+        stage: payload.stage,
+        message: `Stage ${payload.stage} running`
+      }
+    );
 
     const result = await runStage(payload);
 
     console.log(`[worker] stage=${payload.stage} scanId=${payload.scanId} ok=${result.ok}`);
 
     if (!result.ok) {
-      await updateScan(payload.scanId, {
-        status: 'failed',
-        request: payload.request
-      });
+      await updateScan(
+        payload.scanId,
+        {
+          status: 'failed',
+          request: payload.request
+        },
+        {
+          status: 'failed',
+          stage: payload.stage,
+          message: result.error ?? `Stage ${payload.stage} failed`
+        }
+      );
       throw new Error(result.error ?? `Stage ${payload.stage} failed`);
     }
 
@@ -42,10 +58,18 @@ const worker = new Worker<ScanJobPayload>(
         upstreamArtifactId: result.artifactRef
       });
     } else {
-      await updateScan(payload.scanId, {
-        status: 'completed',
-        request: payload.request
-      });
+      await updateScan(
+        payload.scanId,
+        {
+          status: 'completed',
+          request: payload.request
+        },
+        {
+          status: 'completed',
+          stage: payload.stage,
+          message: 'Pipeline completed'
+        }
+      );
       console.log(`[worker] pipeline complete scanId=${payload.scanId}`);
     }
 
@@ -59,7 +83,7 @@ worker.on('failed', async (job, err) => {
   console.error(`[worker] failed job=${job?.id} err=${err.message}`);
   const scanId = job?.data?.scanId;
   if (scanId) {
-    await updateScan(scanId, { status: 'failed' });
+    await updateScan(scanId, { status: 'failed' }, { status: 'failed', message: err.message });
   }
 });
 

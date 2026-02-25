@@ -77,7 +77,22 @@ export async function listScans(limit = 25) {
   return scans.map(toScanRecord);
 }
 
-export async function updateScan(id: string, patch: Partial<ScanRecord>) {
+export async function listScanEvents(scanId: string, limit = 100) {
+  return prisma.scanEvent.findMany({
+    where: { scanId },
+    orderBy: { createdAt: 'asc' },
+    take: limit
+  });
+}
+
+interface ScanEventInput {
+  status?: ScanStatus;
+  stage?: string;
+  message?: string;
+  metadata?: unknown;
+}
+
+export async function updateScan(id: string, patch: Partial<ScanRecord>, event?: ScanEventInput) {
   const existing = await prisma.scan.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return null;
 
@@ -94,9 +109,10 @@ export async function updateScan(id: string, patch: Partial<ScanRecord>) {
   await prisma.scanEvent.create({
     data: {
       scanId: updated.id,
-      status: updated.status,
-      message: 'Scan updated',
-      metadata: (patch as unknown as object) ?? undefined
+      status: event?.status ?? updated.status,
+      stage: event?.stage,
+      message: event?.message ?? 'Scan updated',
+      metadata: (event?.metadata as object | undefined) ?? ((patch as unknown as object) ?? undefined)
     }
   });
 
