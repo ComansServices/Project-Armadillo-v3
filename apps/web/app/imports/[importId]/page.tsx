@@ -2,6 +2,8 @@ import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+type ImportOption = { id: string; createdAt: string; source: string | null; requestedBy: string };
+
 type XmlImportDetail = {
   id: string;
   source: string | null;
@@ -31,6 +33,7 @@ type XmlImportDetail = {
 };
 
 const baseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+const publicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
 const authHeaders = {
   'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
@@ -62,6 +65,16 @@ async function getImportDiff(importId: string, againstImportId: string) {
   });
   if (!res.ok) return null;
   return res.json();
+}
+
+async function getRecentImports(): Promise<ImportOption[]> {
+  const res = await fetch(`${baseUrl}/api/v1/imports?limit=50`, {
+    cache: 'no-store',
+    headers: authHeaders
+  });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { imports?: ImportOption[] };
+  return data.imports ?? [];
 }
 
 async function saveImportAnnotationsAction(formData: FormData) {
@@ -107,7 +120,7 @@ export default async function ImportDetailPage({
     (process.env.WEB_ADMIN_ACTOR_ROLE ?? process.env.WEB_ACTOR_ROLE ?? 'viewer').toLowerCase()
   );
 
-  const data = await getImport(params.importId);
+  const [data, importOptions] = await Promise.all([getImport(params.importId), getRecentImports()]);
   const diff = againstImportId ? await getImportDiff(params.importId, againstImportId) : null;
   const labels = (data.annotations?.labels ?? []).join(', ');
   const notes = data.annotations?.notes ?? '';
@@ -147,9 +160,24 @@ export default async function ImportDetailPage({
       </form>
 
       <h2 style={{ marginBottom: 8 }}>Import Diff</h2>
-      <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <input name="againstImportId" placeholder="Compare against import ID" defaultValue={againstImportId} style={{ minWidth: 420 }} />
+      <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select name="againstImportId" defaultValue={againstImportId} style={{ minWidth: 520 }}>
+          <option value="">Select baseline import…</option>
+          {importOptions
+            .filter((opt) => opt.id !== data.id)
+            .map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {new Date(opt.createdAt).toLocaleString()} · {opt.source ?? '-'} · {opt.requestedBy} · {opt.id}
+              </option>
+            ))}
+        </select>
         <button type="submit">Compare</button>
+        {againstImportId ? (
+          <>
+            <a href={`${publicApiBaseUrl}/api/v1/imports/${data.id}/diff?againstImportId=${againstImportId}`}>Export JSON</a>
+            <a href={`${publicApiBaseUrl}/api/v1/imports/${data.id}/diff?againstImportId=${againstImportId}&format=csv`}>Export CSV</a>
+          </>
+        ) : null}
       </form>
       {diff ? (
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12, marginBottom: 16, background: '#fafafa' }}>

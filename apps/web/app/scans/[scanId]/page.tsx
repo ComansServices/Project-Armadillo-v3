@@ -1,5 +1,13 @@
 import Link from 'next/link';
 
+type ScanOption = {
+  id: string;
+  projectId: string;
+  requestedBy: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  createdAt: string;
+};
+
 type ScanRecord = {
   id: string;
   projectId: string;
@@ -20,6 +28,7 @@ type ScanEvent = {
 };
 
 const baseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+const publicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
 const authHeaders = {
   'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
@@ -51,6 +60,13 @@ async function getScanDiff(scanId: string, againstScanId: string) {
   return res.json();
 }
 
+async function getRecentScans(): Promise<ScanOption[]> {
+  const res = await fetch(`${baseUrl}/api/v1/scans?limit=50`, { cache: 'no-store', headers: authHeaders });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { scans?: ScanOption[] };
+  return data.scans ?? [];
+}
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -64,9 +80,10 @@ export default async function ScanDetailPage({
   const qp = searchParams ? await searchParams : undefined;
   const againstScanId = typeof qp?.againstScanId === 'string' ? qp.againstScanId : '';
 
-  const [scan, events, diff] = await Promise.all([
+  const [scan, events, scanOptions, diff] = await Promise.all([
     getScan(params.scanId),
     getEvents(params.scanId),
+    getRecentScans(),
     againstScanId ? getScanDiff(params.scanId, againstScanId) : Promise.resolve(null)
   ]);
 
@@ -88,9 +105,24 @@ export default async function ScanDetailPage({
       </div>
 
       <h2 style={{ marginBottom: 8 }}>Scan Diff</h2>
-      <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <input name="againstScanId" placeholder="Compare against scan ID" defaultValue={againstScanId} style={{ minWidth: 420 }} />
+      <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select name="againstScanId" defaultValue={againstScanId} style={{ minWidth: 520 }}>
+          <option value="">Select baseline scan…</option>
+          {scanOptions
+            .filter((opt) => opt.id !== scan.id)
+            .map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {new Date(opt.createdAt).toLocaleString()} · {opt.projectId} · {opt.requestedBy} · {opt.id}
+              </option>
+            ))}
+        </select>
         <button type="submit">Compare</button>
+        {againstScanId ? (
+          <>
+            <a href={`${publicApiBaseUrl}/api/v1/scans/${scan.id}/diff?againstScanId=${againstScanId}`}>Export JSON</a>
+            <a href={`${publicApiBaseUrl}/api/v1/scans/${scan.id}/diff?againstScanId=${againstScanId}&format=csv`}>Export CSV</a>
+          </>
+        ) : null}
       </form>
       {diff ? (
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12, marginBottom: 16, background: '#fafafa' }}>

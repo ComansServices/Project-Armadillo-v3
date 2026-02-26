@@ -467,7 +467,7 @@ app.get('/api/v1/scans/:scanId/diff', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
   const { scanId } = req.params as { scanId: string };
-  const { againstScanId } = req.query as { againstScanId?: string };
+  const { againstScanId, format } = req.query as { againstScanId?: string; format?: string };
   if (!againstScanId) return reply.code(400).send({ error: 'againstScanId is required' });
 
   const [a, b] = await Promise.all([
@@ -492,6 +492,14 @@ app.get('/api/v1/scans/:scanId/diff', async (req, reply) => {
     .filter((r) => r.delta !== 0)
     .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta));
 
+  if (format === 'csv') {
+    const header = 'bucket,current,baseline,delta';
+    const rows = deltas.map((d) => `"${d.key.replaceAll('"', '""')}",${d.current},${d.baseline},${d.delta}`);
+    reply.header('content-type', 'text/csv; charset=utf-8');
+    reply.header('content-disposition', `attachment; filename="scan-diff-${scanId}-vs-${againstScanId}.csv"`);
+    return [header, ...rows].join('\n');
+  }
+
   return {
     scanId,
     againstScanId,
@@ -504,7 +512,7 @@ app.get('/api/v1/imports/:importId/diff', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
   const { importId } = req.params as { importId: string };
-  const { againstImportId } = req.query as { againstImportId?: string };
+  const { againstImportId, format } = req.query as { againstImportId?: string; format?: string };
   if (!againstImportId) return reply.code(400).send({ error: 'againstImportId is required' });
 
   const [current, baseline] = await Promise.all([
@@ -533,6 +541,18 @@ app.get('/api/v1/imports/:importId/diff', async (req, reply) => {
 
   for (const key of baseMap.keys()) {
     if (!currMap.has(key)) removed.push(key);
+  }
+
+  if (format === 'csv') {
+    const esc = (v: string) => `"${v.replaceAll('"', '""')}"`;
+    const rows = [
+      ...added.map((k) => `${esc('added')},${esc(k)}`),
+      ...removed.map((k) => `${esc('removed')},${esc(k)}`),
+      ...changed.map((k) => `${esc('changed')},${esc(k)}`)
+    ];
+    reply.header('content-type', 'text/csv; charset=utf-8');
+    reply.header('content-disposition', `attachment; filename="import-diff-${importId}-vs-${againstImportId}.csv"`);
+    return ['category,identityKey', ...rows].join('\n');
   }
 
   return {
