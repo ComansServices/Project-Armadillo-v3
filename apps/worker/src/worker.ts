@@ -10,6 +10,27 @@ const connection = {
 };
 
 const queue = new Queue(SCAN_QUEUE_NAME, { connection });
+const apiBaseUrl = process.env.API_BASE_URL ?? 'http://api:4000';
+
+async function archiveScanReports(scanId: string) {
+  for (const audience of ['ops', 'exec'] as const) {
+    const url = `${apiBaseUrl}/api/v1/reports/scans/${scanId}.pdf?audience=${audience}&archive=1`;
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'x-armadillo-user': 'worker-auto-report',
+          'x-armadillo-role': 'viewer'
+        }
+      });
+      if (!res.ok) {
+        console.warn(`[worker] auto-report archive failed scanId=${scanId} audience=${audience} status=${res.status}`);
+      }
+    } catch (err) {
+      const e = err as Error;
+      console.warn(`[worker] auto-report archive error scanId=${scanId} audience=${audience} err=${e.message}`);
+    }
+  }
+}
 
 const worker = new Worker<ScanJobPayload>(
   SCAN_QUEUE_NAME,
@@ -71,6 +92,7 @@ const worker = new Worker<ScanJobPayload>(
         }
       );
       console.log(`[worker] pipeline complete scanId=${payload.scanId}`);
+      await archiveScanReports(payload.scanId);
     }
 
     return result;

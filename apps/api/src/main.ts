@@ -619,6 +619,25 @@ app.post('/api/v1/imports/:importId/vuln-enrich', async (req, reply) => {
   const exists = await prisma.xmlImport.findUnique({ where: { id: importId }, select: { id: true } });
   if (!exists) return reply.code(404).send({ error: 'Import not found' });
   const result = await enrichImportVulnerabilities(importId);
+
+  for (const audience of ['ops', 'exec'] as const) {
+    const pdf = await buildBrandedReportPdf({
+      title: 'Armadillo Import Report',
+      subtitle: `Import ${importId}`,
+      audience,
+      generatedFor: audience === 'exec' ? 'Jason Comeau (CEO)' : `Ops Team (${actor.actorId})`,
+      dateRange: 'Post-enrichment snapshot',
+      confidentiality: 'INTERNAL CONFIDENTIAL',
+      preparedBy: 'Leo • Comans Services',
+      dashboardUrl: `http://localhost:3000/imports/${importId}`,
+      sections: [
+        { heading: 'Auto-Generated Trigger', lines: ['Generated automatically after vulnerability enrichment completion.'] },
+        { heading: 'Enrichment Summary', lines: [`assetsScanned=${result.assetsScanned}`, `findingsWritten=${result.findingsWritten}`, `distinctCves=${result.distinctCves}`] }
+      ]
+    });
+    await archiveReport({ kind: 'import', refId: importId, audience, pdf, requestedBy: actor.actorId });
+  }
+
   return result;
 });
 
