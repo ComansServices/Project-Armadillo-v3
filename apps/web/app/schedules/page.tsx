@@ -23,6 +23,11 @@ const authHeaders = {
   'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
 };
 
+const writeHeaders = {
+  'x-armadillo-user': process.env.WEB_ADMIN_ACTOR_ID ?? process.env.WEB_ACTOR_ID ?? 'web-ui',
+  'x-armadillo-role': process.env.WEB_ADMIN_ACTOR_ROLE ?? process.env.WEB_ACTOR_ROLE ?? 'viewer'
+};
+
 async function getSchedules(): Promise<ScanSchedule[]> {
   const res = await fetch(`${baseUrl}/api/v1/scan-schedules`, { cache: 'no-store', headers: authHeaders });
   if (!res.ok) throw new Error(`Failed to fetch schedules (${res.status})`);
@@ -44,7 +49,7 @@ async function createScheduleAction(formData: FormData) {
 
   const res = await fetch(`${baseUrl}/api/v1/scan-schedules`, {
     method: 'POST',
-    headers: { ...authHeaders, 'content-type': 'application/json' },
+    headers: { ...writeHeaders, 'content-type': 'application/json' },
     body: JSON.stringify(payload)
   });
 
@@ -59,7 +64,7 @@ async function toggleScheduleAction(formData: FormData) {
   if (!id) return;
   await fetch(`${baseUrl}/api/v1/scan-schedules/${id}/toggle`, {
     method: 'POST',
-    headers: authHeaders
+    headers: writeHeaders
   });
   revalidatePath('/schedules');
   redirect('/schedules');
@@ -69,7 +74,7 @@ async function runDueAction() {
   'use server';
   await fetch(`${baseUrl}/api/v1/scan-schedules/run-due`, {
     method: 'POST',
-    headers: authHeaders
+    headers: writeHeaders
   });
   revalidatePath('/schedules');
   redirect('/schedules?ran=1');
@@ -83,6 +88,9 @@ export default async function SchedulesPage({ searchParams }: { searchParams?: P
   const saved = params?.saved === '1';
   const ran = params?.ran === '1';
   const error = typeof params?.error === 'string' ? params.error : null;
+  const canEditSchedules = ['staff', 'admin', 'owner'].includes(
+    (process.env.WEB_ADMIN_ACTOR_ROLE ?? process.env.WEB_ACTOR_ROLE ?? 'viewer').toLowerCase()
+  );
   const schedules = await getSchedules();
 
   return (
@@ -93,18 +101,19 @@ export default async function SchedulesPage({ searchParams }: { searchParams?: P
       {saved ? <p style={{ color: '#0b7d29' }}>Schedule saved.</p> : null}
       {ran ? <p style={{ color: '#0b7d29' }}>Due schedules processed.</p> : null}
       {error ? <p style={{ color: '#a61b1b' }}>Save failed (HTTP {error}).</p> : null}
+      {!canEditSchedules ? <p style={{ color: '#666' }}>Schedule editor is read-only for current web actor role.</p> : null}
 
-      <form action={createScheduleAction} style={{ display: 'grid', gap: 8, maxWidth: 720, marginBottom: 12 }}>
-        <input name="name" placeholder="Schedule name" required />
-        <input name="cronExpr" placeholder="Cron expr (e.g. 0 2 * * *)" required />
-        <input name="timezone" defaultValue="Australia/Melbourne" required />
-        <input name="projectId" defaultValue="proj-001" required />
-        <input name="requestedBy" defaultValue="web-ui" required />
-        <input name="target" defaultValue="127.0.0.1" required />
-        <button type="submit">Create schedule</button>
+      <form action={canEditSchedules ? createScheduleAction : undefined} style={{ display: 'grid', gap: 8, maxWidth: 720, marginBottom: 12 }}>
+        <input name="name" placeholder="Schedule name" required disabled={!canEditSchedules} />
+        <input name="cronExpr" placeholder="Cron expr (e.g. 0 2 * * *)" required disabled={!canEditSchedules} />
+        <input name="timezone" defaultValue="Australia/Melbourne" required disabled={!canEditSchedules} />
+        <input name="projectId" defaultValue="proj-001" required disabled={!canEditSchedules} />
+        <input name="requestedBy" defaultValue="web-ui" required disabled={!canEditSchedules} />
+        <input name="target" defaultValue="127.0.0.1" required disabled={!canEditSchedules} />
+        <button type="submit" disabled={!canEditSchedules}>Create schedule</button>
       </form>
-      <form action={runDueAction} style={{ marginBottom: 20 }}>
-        <button type="submit">Run due schedules now</button>
+      <form action={canEditSchedules ? runDueAction : undefined} style={{ marginBottom: 20 }}>
+        <button type="submit" disabled={!canEditSchedules}>Run due schedules now</button>
       </form>
 
       <div style={{ overflowX: 'auto' }}>
@@ -127,9 +136,9 @@ export default async function SchedulesPage({ searchParams }: { searchParams?: P
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }} title={s.lastRunMessage ?? ''}>{s.lastRunStatus ?? '-'}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.enabled ? 'yes' : 'no'}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                  <form action={toggleScheduleAction}>
+                  <form action={canEditSchedules ? toggleScheduleAction : undefined}>
                     <input type="hidden" name="id" value={s.id} />
-                    <button type="submit">{s.enabled ? 'Disable' : 'Enable'}</button>
+                    <button type="submit" disabled={!canEditSchedules}>{s.enabled ? 'Disable' : 'Enable'}</button>
                   </form>
                 </td>
               </tr>
