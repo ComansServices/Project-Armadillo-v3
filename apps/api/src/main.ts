@@ -587,11 +587,12 @@ app.post('/api/v1/imports/:importId/vuln-enrich', async (req, reply) => {
 app.get('/api/v1/vulns', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
-  const { importId, assetId, severity, limit } = req.query as {
+  const { importId, assetId, severity, limit, format } = req.query as {
     importId?: string;
     assetId?: string;
     severity?: string;
     limit?: string;
+    format?: string;
   };
   const rows = await listVulnerabilities({
     importId,
@@ -599,6 +600,35 @@ app.get('/api/v1/vulns', async (req, reply) => {
     severity,
     limit: Number(limit ?? 100)
   });
+
+  if (format === 'csv') {
+    const esc = (v: unknown) => `"${String(v ?? '').replaceAll('"', '""')}"`;
+    const header = ['detectedAt', 'severity', 'cve', 'cvss', 'cpe', 'assetId', 'identityKey', 'ip', 'hostname', 'importId', 'title'];
+    const lines = [header.join(',')];
+    for (const r of rows) {
+      lines.push(
+        [
+          r.detectedAt.toISOString(),
+          r.severity,
+          r.cve,
+          r.cvss ?? '',
+          r.cpe ?? '',
+          r.asset.id,
+          r.asset.identityKey,
+          r.asset.ip ?? '',
+          r.asset.hostname ?? '',
+          r.importId,
+          r.title ?? ''
+        ]
+          .map(esc)
+          .join(',')
+      );
+    }
+    reply.header('content-type', 'text/csv; charset=utf-8');
+    reply.header('content-disposition', 'attachment; filename="armadillo-vulns.csv"');
+    return lines.join('\n');
+  }
+
   return { findings: rows };
 });
 

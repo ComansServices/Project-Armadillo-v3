@@ -19,10 +19,21 @@ type Finding = {
 };
 
 const baseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+const publicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 const authHeaders = {
   'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
   'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
 };
+
+const sevRank: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+
+function sevStyle(sev: string) {
+  const s = sev.toLowerCase();
+  if (s === 'critical') return { background: '#7f1d1d', color: '#fff' };
+  if (s === 'high') return { background: '#b91c1c', color: '#fff' };
+  if (s === 'medium') return { background: '#92400e', color: '#fff' };
+  return { background: '#1f2937', color: '#fff' };
+}
 
 async function getFindings(filters: { importId?: string; severity?: string }) {
   const qs = new URLSearchParams();
@@ -45,12 +56,35 @@ export const revalidate = 0;
 export default async function VulnsPage({
   searchParams
 }: {
-  searchParams: { importId?: string; severity?: string };
+  searchParams: { importId?: string; severity?: string; sort?: string; group?: string };
 }) {
-  const findings = await getFindings({
+  const filters = {
     importId: searchParams.importId?.trim() || undefined,
     severity: searchParams.severity?.trim() || undefined
+  };
+  const sort = (searchParams.sort ?? 'severity').toLowerCase();
+  const group = (searchParams.group ?? 'none').toLowerCase();
+
+  const findings = await getFindings(filters);
+  const sorted = [...findings].sort((a, b) => {
+    if (sort === 'detected') return +new Date(b.detectedAt) - +new Date(a.detectedAt);
+    if (sort === 'cvss') return (b.cvss ?? 0) - (a.cvss ?? 0);
+    return (sevRank[b.severity.toLowerCase()] ?? 0) - (sevRank[a.severity.toLowerCase()] ?? 0);
   });
+
+  const exportQs = new URLSearchParams();
+  if (filters.importId) exportQs.set('importId', filters.importId);
+  if (filters.severity) exportQs.set('severity', filters.severity);
+  exportQs.set('limit', '500');
+  exportQs.set('format', 'csv');
+
+  const grouped = sorted.reduce<Record<string, Finding[]>>((acc, f) => {
+    const key = group === 'severity' ? f.severity.toLowerCase() : 'all';
+    (acc[key] ||= []).push(f);
+    return acc;
+  }, {});
+
+  const groupOrder = Object.keys(grouped).sort((a, b) => (sevRank[b] ?? 0) - (sevRank[a] ?? 0));
 
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
@@ -60,56 +94,79 @@ export default async function VulnsPage({
       <h1 style={{ marginBottom: 8 }}>Vulnerability Findings</h1>
       <p style={{ marginTop: 0 }}>CVE/CPE enrichment results from import assets.</p>
 
-      <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <input name="importId" placeholder="Filter import ID" defaultValue={searchParams.importId ?? ''} style={{ minWidth: 360 }} />
-        <select name="severity" defaultValue={searchParams.severity ?? ''}>
+      <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input name="importId" placeholder="Filter import ID" defaultValue={filters.importId ?? ''} style={{ minWidth: 360 }} />
+        <select name="severity" defaultValue={filters.severity ?? ''}>
           <option value="">All severities</option>
           <option value="critical">critical</option>
           <option value="high">high</option>
           <option value="medium">medium</option>
           <option value="low">low</option>
         </select>
+        <select name="sort" defaultValue={sort}>
+          <option value="severity">Sort: severity</option>
+          <option value="cvss">Sort: cvss</option>
+          <option value="detected">Sort: detected time</option>
+        </select>
+        <select name="group" defaultValue={group}>
+          <option value="none">Group: none</option>
+          <option value="severity">Group: severity</option>
+        </select>
         <button type="submit">Apply filters</button>
         <Link href="/vulns">Reset</Link>
+        <a href={`${publicApiBaseUrl}/api/v1/vulns?${exportQs.toString()}`}>Export CSV</a>
       </form>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', minWidth: 1200, width: '100%' }}>
-          <thead>
-            <tr>
-              {['Detected', 'Severity', 'CVE', 'CVSS', 'CPE', 'Asset', 'Import', 'Title'].map((h) => (
-                <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {findings.length === 0 ? (
-              <tr>
-                <td colSpan={8} style={{ padding: '12px 10px', color: '#666' }}>No findings for current filters.</td>
-              </tr>
-            ) : (
-              findings.map((f) => (
-                <tr key={f.id}>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{new Date(f.detectedAt).toLocaleString()}</td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', textTransform: 'uppercase' }}>{f.severity}</td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{f.cve}</td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{f.cvss ?? '-'}</td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{f.cpe ?? '-'}</td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                    <Link href={`/assets/${f.asset.id}`}>{f.asset.identityKey}</Link>
-                  </td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                    <Link href={`/imports/${f.importId}`}>{f.importId}</Link>
-                  </td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{f.title ?? '-'}</td>
+      {groupOrder.map((g) => (
+        <section key={g} style={{ marginBottom: 18 }}>
+          {group === 'severity' ? (
+            <h3 style={{ marginBottom: 8, textTransform: 'uppercase' }}>
+              {g} ({grouped[g].length})
+            </h3>
+          ) : null}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ borderCollapse: 'collapse', minWidth: 1200, width: '100%' }}>
+              <thead>
+                <tr>
+                  {['Detected', 'Severity', 'CVE', 'CVSS', 'CPE', 'Asset', 'Import', 'Title'].map((h) => (
+                    <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {grouped[g].length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '12px 10px', color: '#666' }}>No findings for current filters.</td>
+                  </tr>
+                ) : (
+                  grouped[g].map((f) => (
+                    <tr key={f.id}>
+                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{new Date(f.detectedAt).toLocaleString()}</td>
+                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
+                        <span style={{ ...sevStyle(f.severity), padding: '2px 8px', borderRadius: 999, textTransform: 'uppercase', fontSize: 12 }}>
+                          {f.severity}
+                        </span>
+                      </td>
+                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{f.cve}</td>
+                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{f.cvss ?? '-'}</td>
+                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{f.cpe ?? '-'}</td>
+                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
+                        <Link href={`/assets/${f.asset.id}`}>{f.asset.identityKey}</Link>
+                      </td>
+                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
+                        <Link href={`/imports/${f.importId}`}>{f.importId}</Link>
+                      </td>
+                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{f.title ?? '-'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
     </main>
   );
 }
