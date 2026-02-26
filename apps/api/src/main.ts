@@ -7,6 +7,7 @@ import { backfillAssetIdentityKeys, getAsset, listAssets } from './assets';
 import { getSourcePolicy, listSourcePolicies, upsertSourcePolicy } from './policies';
 import { prisma } from './prisma';
 import { enrichImportVulnerabilities, listVulnerabilities } from './vulnerabilities';
+import { buildSimpleTextPdf } from './report-pdf';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
@@ -638,6 +639,73 @@ app.get('/api/v1/assets/:assetId/vulns', async (req, reply) => {
   const { assetId } = req.params as { assetId: string };
   const rows = await listVulnerabilities({ assetId, limit: 200 });
   return { findings: rows };
+});
+
+app.get('/api/v1/reports/imports/:importId.pdf', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+  const { importId } = req.params as { importId: string };
+  const { againstImportId } = req.query as { againstImportId?: string };
+
+  const importRow = await prisma.xmlImport.findUnique({ where: { id: importId } });
+  if (!importRow) return reply.code(404).send({ error: 'Import not found' });
+
+  const findings = await listVulnerabilities({ importId, limit: 50 });
+  const sev = findings.reduce<Record<string, number>>((acc, f) => {
+    const key = String(f.severity || 'unknown').toLowerCase();
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  let diffSummary = '';
+  if (againstImportId) {
+    const [current, baseline] = await Promise.all([
+      prisma.asset.findMany({ where: { importId }, select: { identityKey: true, ports: true, serviceTags: true } }),
+      prisma.asset.findMany({ where: { importId: againstImportId }, select: { identityKey: true, ports: true, serviceTags: true } })
+    ]);
+    const currMap = new Map(current.map((a) => [a.identityKey, a]));
+    const baseMap = new Map(baseline.map((a) => [a.identityKey, a]));
+    let added = 0;
+    let removed = 0;
+    let changed = 0;
+    for (const key of currMap.keys()) {
+      if (!baseMap.has(key)) {
+        added += 1;
+        continue;
+      }
+      const c = currMap.get(key)!;
+      const b = baseMap.get(key)!;
+      const portsChanged = JSON.stringify([...c.ports].sort((x, y) => x - y)) !== JSON.stringify([...b.ports].sort((x, y) => x - y));
+      const tagsChanged = JSON.stringify([...c.serviceTags].sort()) !== JSON.stringify([...b.serviceTags].sort());
+      if (portsChanged || tagsChanged) changed += 1;
+    }
+    for (const key of baseMap.keys()) if (!currMap.has(key)) removed += 1;
+    diffSummary = `Diff vs ${againstImportId}: added=${added}, removed=${removed}, changed=${changed}`;
+  }
+
+  const lines = [
+    `Generated: ${new Date().toISOString()}`,
+    `Import: ${importRow.id}`,
+    `Source: ${importRow.source ?? '-'}`,
+    `RequestedBy: ${importRow.requestedBy}`,
+    `Quality: mode=${importRow.qualityMode} status=${importRow.qualityStatus}`,
+    `Counts: items=${importRow.itemCount} normalized=${importRow.normalizedAssetCount} skipped=${importRow.skippedAssetCount} invalid=${importRow.invalidAssetCount}`,
+    diffSummary,
+    '',
+    `Vulnerability findings: ${findings.length}`,
+    `Severity split: critical=${sev.critical ?? 0}, high=${sev.high ?? 0}, medium=${sev.medium ?? 0}, low=${sev.low ?? 0}`,
+    '',
+    'Top findings:'
+  ];
+
+  for (const f of findings.slice(0, 12)) {
+    lines.push(`- [${String(f.severity).toUpperCase()}] ${f.cve} ${f.asset.identityKey} ${f.title ?? ''}`.trim());
+  }
+
+  const pdf = buildSimpleTextPdf('Armadillo Import Report', lines);
+  reply.header('content-type', 'application/pdf');
+  reply.header('content-disposition', `attachment; filename="armadillo-import-report-${importId}.pdf"`);
+  return reply.send(pdf);
 });
 
 app.listen({ host: '0.0.0.0', port: 4000 }).then(() => {

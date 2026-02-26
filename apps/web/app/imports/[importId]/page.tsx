@@ -189,6 +189,16 @@ export default async function ImportDetailPage({
         <Link href={`/vulns?importId=${data.id}`}>View findings for this import →</Link>
       </form>
 
+      <p style={{ marginTop: 0 }}>
+        <a
+          href={`${publicApiBaseUrl}/api/v1/reports/imports/${data.id}.pdf${effectiveAgainstImportId ? `?againstImportId=${effectiveAgainstImportId}` : ''}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Download PDF report →
+        </a>
+      </p>
+
       <h2 style={{ marginBottom: 8 }}>Import Diff</h2>
       <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <select name="againstImportId" defaultValue={effectiveAgainstImportId} style={{ minWidth: 520 }}>
