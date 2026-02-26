@@ -52,7 +52,7 @@ async function saveAssetAnnotationsAction(formData: FormData) {
     .filter(Boolean);
   const notes = String(formData.get('notes') ?? '').trim();
 
-  await fetch(`${baseUrl}/api/v1/assets/${assetId}/annotations`, {
+  const res = await fetch(`${baseUrl}/api/v1/assets/${assetId}/annotations`, {
     method: 'POST',
     headers: {
       ...editHeaders,
@@ -62,6 +62,7 @@ async function saveAssetAnnotationsAction(formData: FormData) {
   });
 
   revalidatePath(`/assets/${assetId}`);
+  if (!res.ok) redirect(`/assets/${assetId}?saveError=${res.status}`);
   redirect(`/assets/${assetId}?saved=1`);
 }
 
@@ -77,6 +78,10 @@ export default async function AssetDetailPage({
 }) {
   const qp = searchParams ? await searchParams : undefined;
   const saved = qp?.saved === '1';
+  const saveError = typeof qp?.saveError === 'string' ? qp.saveError : null;
+  const canEdit = ['owner', 'admin', 'staff'].includes(
+    (process.env.WEB_ADMIN_ACTOR_ROLE ?? process.env.WEB_ACTOR_ROLE ?? 'viewer').toLowerCase()
+  );
   const data = await getAsset(params.assetId);
   const labels = (data.annotations?.labels ?? []).join(', ');
   const notes = data.annotations?.notes ?? '';
@@ -102,18 +107,20 @@ export default async function AssetDetailPage({
 
       <h2 style={{ marginBottom: 8 }}>Annotations</h2>
       {saved ? <p style={{ color: '#0b7d29' }}>Annotations saved.</p> : null}
-      <form action={saveAssetAnnotationsAction} style={{ display: 'grid', gap: 8, marginBottom: 16, maxWidth: 900 }}>
+      {saveError ? <p style={{ color: '#a61b1b' }}>Annotation save failed (HTTP {saveError}).</p> : null}
+      {!canEdit ? <p style={{ color: '#666' }}>Annotations are read-only for current web actor role.</p> : null}
+      <form action={canEdit ? saveAssetAnnotationsAction : undefined} style={{ display: 'grid', gap: 8, marginBottom: 16, maxWidth: 900 }}>
         <input type="hidden" name="assetId" value={data.id} />
         <label>
           Labels (comma separated)
-          <input name="labels" defaultValue={labels} style={{ width: '100%' }} />
+          <input name="labels" defaultValue={labels} style={{ width: '100%' }} disabled={!canEdit} />
         </label>
         <label>
           Notes
-          <textarea name="notes" defaultValue={notes} rows={4} style={{ width: '100%' }} />
+          <textarea name="notes" defaultValue={notes} rows={4} style={{ width: '100%' }} disabled={!canEdit} />
         </label>
         <div>
-          <button type="submit">Save annotations</button>
+          <button type="submit" disabled={!canEdit}>Save annotations</button>
         </div>
       </form>
 

@@ -75,7 +75,7 @@ async function saveImportAnnotationsAction(formData: FormData) {
     .filter(Boolean);
   const notes = String(formData.get('notes') ?? '').trim();
 
-  await fetch(`${baseUrl}/api/v1/imports/${importId}/annotations`, {
+  const res = await fetch(`${baseUrl}/api/v1/imports/${importId}/annotations`, {
     method: 'POST',
     headers: {
       ...editHeaders,
@@ -85,6 +85,7 @@ async function saveImportAnnotationsAction(formData: FormData) {
   });
 
   revalidatePath(`/imports/${importId}`);
+  if (!res.ok) redirect(`/imports/${importId}?saveError=${res.status}`);
   redirect(`/imports/${importId}?saved=1`);
 }
 
@@ -101,6 +102,10 @@ export default async function ImportDetailPage({
   const qp = searchParams ? await searchParams : undefined;
   const againstImportId = typeof qp?.againstImportId === 'string' ? qp.againstImportId : '';
   const saved = qp?.saved === '1';
+  const saveError = typeof qp?.saveError === 'string' ? qp.saveError : null;
+  const canEdit = ['owner', 'admin', 'staff'].includes(
+    (process.env.WEB_ADMIN_ACTOR_ROLE ?? process.env.WEB_ACTOR_ROLE ?? 'viewer').toLowerCase()
+  );
 
   const data = await getImport(params.importId);
   const diff = againstImportId ? await getImportDiff(params.importId, againstImportId) : null;
@@ -124,18 +129,20 @@ export default async function ImportDetailPage({
 
       <h2 style={{ marginBottom: 8 }}>Annotations</h2>
       {saved ? <p style={{ color: '#0b7d29' }}>Annotations saved.</p> : null}
-      <form action={saveImportAnnotationsAction} style={{ display: 'grid', gap: 8, marginBottom: 16, maxWidth: 900 }}>
+      {saveError ? <p style={{ color: '#a61b1b' }}>Annotation save failed (HTTP {saveError}).</p> : null}
+      {!canEdit ? <p style={{ color: '#666' }}>Annotations are read-only for current web actor role.</p> : null}
+      <form action={canEdit ? saveImportAnnotationsAction : undefined} style={{ display: 'grid', gap: 8, marginBottom: 16, maxWidth: 900 }}>
         <input type="hidden" name="importId" value={data.id} />
         <label>
           Labels (comma separated)
-          <input name="labels" defaultValue={labels} style={{ width: '100%' }} />
+          <input name="labels" defaultValue={labels} style={{ width: '100%' }} disabled={!canEdit} />
         </label>
         <label>
           Notes
-          <textarea name="notes" defaultValue={notes} rows={4} style={{ width: '100%' }} />
+          <textarea name="notes" defaultValue={notes} rows={4} style={{ width: '100%' }} disabled={!canEdit} />
         </label>
         <div>
-          <button type="submit">Save annotations</button>
+          <button type="submit" disabled={!canEdit}>Save annotations</button>
         </div>
       </form>
 
@@ -152,8 +159,14 @@ export default async function ImportDetailPage({
             <strong>Removed:</strong> {diff.summary.removed} &nbsp; | &nbsp;
             <strong>Changed:</strong> {diff.summary.changed}
           </p>
-          <p style={{ marginBottom: 0 }}>
+          <p style={{ marginBottom: 6 }}>
             <strong>Sample added:</strong> {(diff.samples.added ?? []).slice(0, 5).join(', ') || '-'}
+          </p>
+          <p style={{ margin: '0 0 6px 0' }}>
+            <strong>Sample removed:</strong> {(diff.samples.removed ?? []).slice(0, 5).join(', ') || '-'}
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            <strong>Sample changed:</strong> {(diff.samples.changed ?? []).slice(0, 5).join(', ') || '-'}
           </p>
         </div>
       ) : null}

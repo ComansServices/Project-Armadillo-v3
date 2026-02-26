@@ -98,14 +98,18 @@ export default async function ScanDetailPage({
             <strong>Current/Baseline Events:</strong> {diff.summary.currentEvents}/{diff.summary.baselineEvents} &nbsp; | &nbsp;
             <strong>Changed Buckets:</strong> {diff.summary.changedBuckets}
           </p>
-          <ul style={{ marginBottom: 0 }}>
-            {(diff.deltas ?? []).slice(0, 10).map((d: { key: string; delta: number }) => (
-              <li key={d.key}>
-                {d.key}: {d.delta > 0 ? '+' : ''}
-                {d.delta}
-              </li>
-            ))}
-          </ul>
+          {(diff.deltas ?? []).length === 0 ? (
+            <p style={{ marginBottom: 0, color: '#666' }}>No stage/status bucket differences detected.</p>
+          ) : (
+            <ul style={{ marginBottom: 0 }}>
+              {(diff.deltas ?? []).slice(0, 10).map((d: { key: string; delta: number }) => (
+                <li key={d.key}>
+                  {d.key}: {d.delta > 0 ? '+' : ''}
+                  {d.delta}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ) : null}
 
