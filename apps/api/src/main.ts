@@ -711,6 +711,13 @@ app.get('/api/v1/reports/imports/:importId.pdf', async (req, reply) => {
     generatedFor: reportAudience === 'exec' ? 'Jason Comeau (CEO)' : `Ops Team (${importRow.requestedBy})`,
     dateRange: againstImportId ? `${againstImportId} → ${importId}` : 'Single import snapshot',
     confidentiality: 'INTERNAL CONFIDENTIAL',
+    metricCards: [
+      { label: 'Critical', value: String(sev.critical ?? 0), tone: 'critical' },
+      { label: 'High', value: String(sev.high ?? 0), tone: 'high' },
+      { label: 'Medium', value: String(sev.medium ?? 0), tone: 'medium' },
+      { label: 'Low', value: String(sev.low ?? 0), tone: 'low' }
+    ],
+    signoff: { name: 'Jason Comeau', role: 'CEO, Comans Services' },
     sections: [
       {
         heading: 'Import Overview',
@@ -799,6 +806,13 @@ app.get('/api/v1/reports/scans/:scanId.pdf', async (req, reply) => {
     generatedFor: reportAudience === 'exec' ? 'Jason Comeau (CEO)' : `Ops Team (${scan.requestedBy})`,
     dateRange: againstScanId ? `${againstScanId} → ${scanId}` : 'Single scan snapshot',
     confidentiality: 'INTERNAL CONFIDENTIAL',
+    metricCards: [
+      { label: 'Critical', value: String(sev.critical ?? 0), tone: 'critical' },
+      { label: 'High', value: String(sev.high ?? 0), tone: 'high' },
+      { label: 'Medium', value: String(sev.medium ?? 0), tone: 'medium' },
+      { label: 'Low', value: String(sev.low ?? 0), tone: 'low' }
+    ],
+    signoff: { name: 'Jason Comeau', role: 'CEO, Comans Services' },
     sections: [
       {
         heading: 'Scan Overview',

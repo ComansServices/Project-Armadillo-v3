@@ -45,6 +45,8 @@ export async function buildBrandedReportPdf(options: {
   generatedFor?: string;
   dateRange?: string;
   confidentiality?: string;
+  metricCards?: Array<{ label: string; value: string; tone?: 'critical' | 'high' | 'medium' | 'low' | 'neutral' }>;
+  signoff?: { name: string; role?: string };
   sections: Array<{ heading: string; lines: string[] }>;
 }) {
   const doc = new PDFDocument({ size: 'A4', margin: 40 });
@@ -85,9 +87,35 @@ export async function buildBrandedReportPdf(options: {
     cy += 22;
   }
 
+  const toneFill: Record<string, string> = {
+    critical: '#7f1d1d',
+    high: '#991b1b',
+    medium: '#92400e',
+    low: '#1f2937',
+    neutral: '#374151'
+  };
+  const cards = options.metricCards ?? [];
+  if (cards.length) {
+    const top = 416;
+    const cardW = 118;
+    const gap = 12;
+    cards.slice(0, 4).forEach((card, idx) => {
+      const x = 40 + idx * (cardW + gap);
+      const fill = toneFill[card.tone ?? 'neutral'] ?? toneFill.neutral;
+      doc.roundedRect(x, top, cardW, 78, 8).fill(fill);
+      doc.fillColor('#ffffff').fontSize(10).text(card.label.toUpperCase(), x + 10, top + 10, { width: cardW - 20, align: 'center' });
+      doc.fontSize(22).text(card.value, x + 10, top + 32, { width: cardW - 20, align: 'center' });
+    });
+  }
+
   doc.roundedRect(40, 700, 515, 92, 8).fillAndStroke('#f9fafb', '#e5e7eb');
-  doc.fillColor(brandRed).fontSize(12).text('Confidentiality Notice', 56, 720);
-  doc.fillColor('#4b5563').fontSize(10).text('This report contains operational and security information intended only for authorised recipients.', 56, 742, { width: 480 });
+  doc.fillColor(brandRed).fontSize(12).text('Confidentiality Notice', 56, 716);
+  doc.fillColor('#4b5563').fontSize(10).text('This report contains operational and security information intended only for authorised recipients.', 56, 736, { width: 480 });
+
+  const signoffName = options.signoff?.name ?? 'Comans Services';
+  const signoffRole = options.signoff?.role ?? 'Authorised by Operations';
+  doc.fillColor('#374151').fontSize(10).text(`Signed: ${signoffName}`, 56, 760, { width: 220 });
+  doc.text(signoffRole, 56, 774, { width: 280 });
 
   // Detail page
   doc.addPage();
