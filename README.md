@@ -56,10 +56,14 @@ Implemented through **Step 23 kickoff**:
   - GitHub workflow: `.github/workflows/phase4-gate.yml`
   - threat model: `docs/phase4-threat-model.md`
   - pen-test prep checklist: `docs/phase4-pen-test-prep-checklist.md`
+- Phase 4.3 additions:
+  - rollback runbook: `docs/phase4-rollback-runbook.md`
+  - beta release notes: `docs/phase4-beta-release-notes.md`
+  - migration runbook: `docs/phase4-migration-runbook.md`
 - Next planned dev pickup:
   - apply/verify perf indexes in all envs
-  - complete rollback pack + migration notes for beta cut
-  - expand smoke checks into deeper integration assertions.
+  - expand smoke checks into deeper integration assertions
+  - final beta sign-off review against readiness checklist.
 
 ## Pipeline (v1 practical combo)
 `naabu -> nmap -> httpx -> nuclei`
