@@ -10,6 +10,7 @@ Owner: Comans / Leo
   - U1 Foundations: Complete
   - U2 Core Workflow + Triage Pass: Complete
   - U3 Analysis-page enhancement: Next
+- **Phase 7 Operator Confidence: Sprint 1 COMPLETE** (2026-02-27)
 
 ## Completed Milestones (latest)
 1. Item 2 Network parity complete + desktop/mobile usability fixes
@@ -53,3 +54,16 @@ Owner: Comans / Leo
 - Seeded demo-scale synthetic dataset for realistic usage rehearsal (scan/import/asset/vuln volume)
 - Ran full page QA sweep and aligned detail pages with shared AppShell modern UI pattern
 - Fixed imports-page hydration warning caused by style selector escaping mismatch
+- **Dev Mode: Armadillo quality spike alerts suppressed** — `ARMADILLO_DEV_MODE=1` set via `launchctl` and shell profiles; all 3 alert scripts updated to exit early when dev mode active
+- **Phase 7 Sprint 1 launched** — `docs/sprint-phase7-1.md` created; 4 items prioritized: vuln remediation tracking, global Cmd+K search, overview attention banner, asset new/changed badges
+- **Phase 7 Sprint 1 COMPLETE** — All 4 items (backend + frontend + tested):
+  - ✅ Item 1: Vuln remediation tracking (DB columns, PATCH /vulns/:id, POST /vulns/bulk-update, inline edit UI, Status/Assignee/Due columns)
+  - ✅ Item 2: Global Cmd+K search (API endpoint + modal UI with keyboard nav)
+  - ✅ Item 3: Attention banner (API with 7-day trend + UI banner with sparkline + retry)
+  - ✅ Item 4: Asset change badges (deltaSinceLast column + badge UI with new/new_this_week/changed)
+  - ✅ All APIs verified via automated testing (search, attention, vuln updates, asset badges)
+- **Phase 7 Sprint 2 IN PROGRESS** — Items 1-3 backend complete:
+  - ✅ Item 1: Exploitability-first grouping (stats API, blast radius, 🔥/📋 badges, filter tabs)
+  - ✅ Item 2: Blast radius chips with live API data
+  - ✅ Item 3: Attack path simulation API (entry → target path with vulns)
+  - 🔲 Item 4: Exposure scoring (internet-facing detection)

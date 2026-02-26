@@ -85,6 +85,30 @@ export async function listScanEvents(scanId: string, limit = 100) {
   });
 }
 
+export async function listFailedScansSince(since: Date, limit = 50) {
+  const scans = await prisma.scan.findMany({
+    where: {
+      status: 'failed',
+      updatedAt: { gte: since }
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: limit
+  });
+  return scans.map(toScanRecord);
+}
+
+export async function getScanWithEvents(id: string) {
+  const scan = await prisma.scan.findUnique({
+    where: { id },
+    include: { events: { orderBy: { createdAt: 'asc' } } }
+  });
+  if (!scan) return null;
+  return {
+    ...toScanRecord(scan),
+    events: scan.events
+  };
+}
+
 interface ScanEventInput {
   status?: ScanStatus;
   stage?: string;

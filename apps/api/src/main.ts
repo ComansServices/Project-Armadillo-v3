@@ -4,12 +4,12 @@ import path from 'node:path';
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import { CronExpressionParser } from 'cron-parser';
 import { scanQueue } from './queue';
-import { createScan, getScan, listScans, listScanEvents } from './store';
+import { createScan, getScan, listScans, listScanEvents, listFailedScansSince, getScanWithEvents } from './store';
 import { createXmlImport, getImportQualityDigest, getXmlImport, listImportQualityTrend, listXmlImports } from './imports';
-import { backfillAssetIdentityKeys, getAsset, listAssets } from './assets';
+import { backfillAssetIdentityKeys, getAsset, listAssets, listAssetsWithBadges } from './assets';
 import { getSourcePolicy, listSourcePolicies, upsertSourcePolicy } from './policies';
 import { prisma } from './prisma';
-import { enrichImportVulnerabilities, listVulnerabilities } from './vulnerabilities';
+import { enrichImportVulnerabilities, listVulnerabilities, updateVulnerability, bulkUpdateVulnerabilities, getBlastRadius, getExploitabilityStats } from './vulnerabilities';
 import { buildBrandedReportPdf } from './report-pdf';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
@@ -380,6 +380,99 @@ app.get('/api/v1/scans/:scanId/events', async (req, reply) => {
   return { events };
 });
 
+// Overview attention banner: failed scans in last 24h
+app.get('/api/v1/scans/attention', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
+  const failedScans = await listFailedScansSince(since, 10);
+  const scoped = actor.projects.includes('*') ? failedScans : failedScans.filter((s) => ensureProjectScope(actor, s.projectId));
+
+  const totalFailed = scoped.length;
+  const needsAttention = totalFailed > 0;
+
+  // Calculate 7-day trend for sparkline
+  const trendSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const trendScans = await prisma.scan.findMany({
+    where: {
+      createdAt: { gte: trendSince }
+    },
+    select: { status: true, createdAt: true }
+  });
+
+  const trend = Array.from({ length: 7 }, (_, i) => {
+    const dayStart = new Date(Date.now() - (7 - i) * 24 * 60 * 60 * 1000);
+    const dayEnd = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000);
+    const dayScans = trendScans.filter(s => s.createdAt >= dayStart && s.createdAt < dayEnd);
+    return {
+      date: dayStart.toISOString().split('T')[0],
+      completed: dayScans.filter(s => s.status === 'completed').length,
+      failed: dayScans.filter(s => s.status === 'failed').length
+    };
+  });
+
+  return {
+    needsAttention,
+    totalFailed,
+    failedScans: scoped.map(s => ({
+      id: s.id,
+      status: s.status,
+      projectId: s.projectId,
+      requestedBy: s.requestedBy,
+      updatedAt: s.updatedAt
+    })),
+    trend
+  };
+});
+
+// Retry a failed scan
+app.post('/api/v1/scans/:scanId/retry', async (req, reply) => {
+  const actor = requireRole(req, reply, 'staff');
+  if (!actor) return;
+
+  const { scanId } = req.params as { scanId: string };
+  const scan = await getScanWithEvents(scanId);
+  if (!scan) {
+    return reply.code(404).send({ error: 'Scan not found' });
+  }
+  if (!ensureProjectScope(actor, scan.projectId)) {
+    return reply.code(403).send({ error: 'project_scope_denied', projectId: scan.projectId });
+  }
+
+  // Only allow retry of failed scans
+  if (scan.status !== 'failed') {
+    return reply.code(400).send({ error: 'Only failed scans can be retried' });
+  }
+
+  // Create new scan with same request
+  const newScanId = randomUUID();
+  const request = scan.request ?? { projectId: scan.projectId, targets: [] };
+
+  await createScan({
+    id: newScanId,
+    projectId: scan.projectId,
+    requestedBy: actor.actorId,
+    status: 'queued',
+    request
+  });
+
+  const firstJob: ScanJobPayload = {
+    scanId: newScanId,
+    stage: 'naabu',
+    request
+  };
+
+  await scanQueue.add('scan-stage', firstJob, {
+    attempts: 2,
+    removeOnComplete: 100,
+    removeOnFail: 100
+  });
+
+  app.log.info({ actorId: actor.actorId, role: actor.role, originalScanId: scanId, newScanId }, 'scan retried');
+  return { success: true, newScanId, originalScanId: scanId };
+});
+
 app.get('/api/v1/scan-schedules', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
@@ -694,23 +787,23 @@ app.get('/api/v1/assets', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
 
-  const { limit, ip, hostname, tag, source } = req.query as {
+  const { limit, ip, hostname, tag, source, badges } = req.query as {
     limit?: string;
     ip?: string;
     hostname?: string;
     tag?: string;
     source?: string;
+    badges?: string;
   };
   const parsedLimit = Math.min(Math.max(Number(limit ?? 50), 1), 200);
-  const assets = await listAssets(Number.isNaN(parsedLimit) ? 50 : parsedLimit, {
-    ip,
-    hostname,
-    tag,
-    source
-  });
+  const withBadges = badges === 'true' || badges === '1';
+
+  const assets = withBadges
+    ? await listAssetsWithBadges(Number.isNaN(parsedLimit) ? 50 : parsedLimit, { ip, hostname, tag, source })
+    : await listAssets(Number.isNaN(parsedLimit) ? 50 : parsedLimit, { ip, hostname, tag, source });
 
   return {
-    assets: assets.map((a) => ({
+    assets: assets.map((a: any) => ({
       id: a.id,
       identityKey: a.identityKey,
       importId: a.importId,
@@ -723,7 +816,8 @@ app.get('/api/v1/assets', async (req, reply) => {
       seenCount: a.seenCount,
       firstSeenAt: a.firstSeenAt,
       lastSeenAt: a.lastSeenAt,
-      createdAt: a.createdAt
+      createdAt: a.createdAt,
+      ...(withBadges && a.badge ? { badge: a.badge } : {})
     }))
   };
 });
@@ -930,10 +1024,15 @@ app.post('/api/v1/imports/:importId/vuln-enrich', async (req, reply) => {
 app.get('/api/v1/vulns', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
-  const { importId, assetId, severity, limit, format } = req.query as {
+  const { importId, assetId, severity, assignedTo, remediationStatus, dueBefore, dueAfter, hasExploit, limit, format } = req.query as {
     importId?: string;
     assetId?: string;
     severity?: string;
+    assignedTo?: string;
+    remediationStatus?: string;
+    dueBefore?: string;
+    dueAfter?: string;
+    hasExploit?: string;
     limit?: string;
     format?: string;
   };
@@ -941,6 +1040,11 @@ app.get('/api/v1/vulns', async (req, reply) => {
     importId,
     assetId,
     severity,
+    assignedTo,
+    remediationStatus,
+    dueBefore,
+    dueAfter,
+    hasExploit: hasExploit === 'true' ? true : hasExploit === 'false' ? false : undefined,
     limit: Number(limit ?? 100)
   });
 
@@ -960,6 +1064,9 @@ app.get('/api/v1/vulns', async (req, reply) => {
       'importId',
       'title',
       'description',
+      'assignedTo',
+      'dueDate',
+      'remediationStatus',
       'exploitRefs'
     ];
     const lines = [header.join(',')];
@@ -979,6 +1086,9 @@ app.get('/api/v1/vulns', async (req, reply) => {
           r.importId,
           r.title ?? '',
           r.description ?? '',
+          (r as { assignedTo?: string | null }).assignedTo ?? '',
+          (r as { dueDate?: Date | null }).dueDate ? (r as { dueDate?: Date | null }).dueDate!.toISOString().split('T')[0] : '',
+          (r as { remediationStatus?: string }).remediationStatus ?? 'open',
           Array.isArray((r as { exploitRefs?: Array<{ source: string; id: string }> }).exploitRefs)
             ? ((r as { exploitRefs?: Array<{ source: string; id: string }> }).exploitRefs ?? [])
                 .map((e) => `${e.source}:${e.id}`)
@@ -1003,6 +1113,284 @@ app.get('/api/v1/assets/:assetId/vulns', async (req, reply) => {
   const { assetId } = req.params as { assetId: string };
   const rows = await listVulnerabilities({ assetId, limit: 200 });
   return { findings: rows };
+});
+
+app.patch('/api/v1/vulns/:vulnId', async (req, reply) => {
+  const actor = requireRole(req, reply, 'staff');
+  if (!actor) return;
+
+  const { vulnId } = req.params as { vulnId: string };
+  const id = Number(vulnId);
+  if (Number.isNaN(id)) {
+    return reply.code(400).send({ error: 'Invalid vulnerability ID' });
+  }
+
+  const body = req.body as {
+    assignedTo?: string | null;
+    dueDate?: string | null;
+    remediationStatus?: 'open' | 'in_progress' | 'on_hold' | 'resolved';
+  };
+
+  try {
+    const updated = await updateVulnerability(id, body);
+    app.log.info({ actorId: actor.actorId, role: actor.role, vulnId: id }, 'vulnerability updated');
+    return updated;
+  } catch (err: any) {
+    if (err?.code === 'P2025') {
+      return reply.code(404).send({ error: 'Vulnerability not found' });
+    }
+    throw err;
+  }
+});
+
+app.post('/api/v1/vulns/bulk-update', async (req, reply) => {
+  const actor = requireRole(req, reply, 'staff');
+  if (!actor) return;
+
+  const body = req.body as {
+    ids?: number[];
+    assignedTo?: string | null;
+    dueDate?: string | null;
+    remediationStatus?: 'open' | 'in_progress' | 'on_hold' | 'resolved';
+  };
+
+  if (!Array.isArray(body?.ids) || body.ids.length === 0) {
+    return reply.code(400).send({ error: 'ids array is required' });
+  }
+
+  const result = await bulkUpdateVulnerabilities(body.ids, {
+    assignedTo: body.assignedTo,
+    dueDate: body.dueDate,
+    remediationStatus: body.remediationStatus
+  });
+
+  app.log.info({ actorId: actor.actorId, role: actor.role, count: result.updated }, 'vulnerabilities bulk updated');
+  return result;
+});
+
+// Get blast radius for a CVE
+app.get('/api/v1/vulns/:cve/blast-radius', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { cve } = req.params as { cve: string };
+  const data = await getBlastRadius(cve);
+  return data;
+});
+
+// Get exploitability stats
+app.get('/api/v1/vulns/stats/exploitability', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { importId } = req.query as { importId?: string };
+  const stats = await getExploitabilityStats(importId);
+  return stats;
+});
+
+// Attack path simulation
+app.post('/api/v1/network/attack-path', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const body = req.body as { entryAssetId?: string; targetAssetId?: string };
+  if (!body?.entryAssetId || !body?.targetAssetId) {
+    return reply.code(400).send({ error: 'entryAssetId and targetAssetId are required' });
+  }
+
+  // Get entry and target assets
+  const [entryAsset, targetAsset] = await Promise.all([
+    prisma.asset.findUnique({
+      where: { id: body.entryAssetId },
+      select: { id: true, ip: true, hostname: true, identityKey: true, ports: true, serviceTags: true }
+    }),
+    prisma.asset.findUnique({
+      where: { id: body.targetAssetId },
+      select: { id: true, ip: true, hostname: true, identityKey: true, ports: true, serviceTags: true }
+    })
+  ]);
+
+  if (!entryAsset || !targetAsset) {
+    return reply.code(404).send({ error: 'Asset not found' });
+  }
+
+  // Simple path finding: look for assets that could be intermediate hops
+  // In a real implementation, this would use network topology data
+  const allAssets = await prisma.asset.findMany({
+    select: { id: true, ip: true, hostname: true, identityKey: true, ports: true, serviceTags: true }
+  });
+
+  // Find potential path (simplified - direct or 1-hop)
+  const path: typeof allAssets = [entryAsset];
+  
+  // Check for direct connectivity (same subnet or shared service)
+  const entryIpParts = entryAsset.ip?.split('.') || [];
+  const targetIpParts = targetAsset.ip?.split('.') || [];
+  const sameSubnet = entryIpParts.length === 4 && targetIpParts.length === 4 && 
+                     entryIpParts[0] === targetIpParts[0] && entryIpParts[1] === targetIpParts[1];
+  
+  // Find intermediate hop if not same subnet
+  if (!sameSubnet) {
+    const hop = allAssets.find(a => {
+      if (a.id === entryAsset.id || a.id === targetAsset.id) return false;
+      const hopIpParts = a.ip?.split('.') || [];
+      // Asset that can bridge networks (has ports 22 or 3389 - SSH/RDP)
+      return (a.ports.includes(22) || a.ports.includes(3389)) &&
+             (hopIpParts[0] === entryIpParts[0] || hopIpParts[0] === targetIpParts[0]);
+    });
+    if (hop) path.push(hop);
+  }
+  
+  path.push(targetAsset);
+
+  // Get vulnerabilities for each hop
+  const pathWithVulns = await Promise.all(
+    path.map(async (asset) => {
+      const vulns = await prisma.assetVulnerability.findMany({
+        where: { assetId: asset.id },
+        select: { cve: true, severity: true, cvss: true, title: true }
+      });
+      return {
+        ...asset,
+        vulnerabilities: vulns
+      };
+    })
+  );
+
+  return {
+    entryAsset: { id: entryAsset.id, identityKey: entryAsset.identityKey, ip: entryAsset.ip },
+    targetAsset: { id: targetAsset.id, identityKey: targetAsset.identityKey, ip: targetAsset.ip },
+    path: pathWithVulns.map((p, i) => ({
+      hop: i,
+      asset: { id: p.id, identityKey: p.identityKey, ip: p.ip, hostname: p.hostname },
+      openPorts: p.ports,
+      services: p.serviceTags,
+      vulnerabilities: p.vulnerabilities,
+      lateralMovementRisk: p.vulnerabilities.filter(v => 
+        v.cve.includes('2024-6387') || // SSH
+        v.cve.includes('2019-0708')    // RDP
+      ).length > 0
+    })),
+    directPath: sameSubnet,
+    hopCount: path.length - 1
+  };
+});
+
+// Global search endpoint for Cmd+K
+app.get('/api/v1/search', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { q, limit } = req.query as { q?: string; limit?: string };
+  const query = q?.trim();
+  if (!query || query.length < 2) {
+    return reply.code(400).send({ error: 'Query must be at least 2 characters' });
+  }
+
+  const take = Math.min(Math.max(Number(limit ?? 10), 1), 50);
+  const results: Array<{
+    type: 'vulnerability' | 'asset' | 'scan' | 'import';
+    id: string;
+    title: string;
+    subtitle: string;
+    url: string;
+  }> = [];
+
+  // Search vulnerabilities by CVE
+  const vulns = await prisma.assetVulnerability.findMany({
+    where: {
+      cve: { contains: query, mode: 'insensitive' }
+    },
+    take,
+    include: {
+      asset: { select: { ip: true, hostname: true } }
+    }
+  });
+  for (const v of vulns) {
+    results.push({
+      type: 'vulnerability',
+      id: String(v.id),
+      title: v.cve,
+      subtitle: `${v.severity} • ${v.asset.ip ?? v.asset.hostname ?? 'unknown asset'}`,
+      url: `/vulns?cve=${encodeURIComponent(v.cve)}`
+    });
+  }
+
+  // Search assets by IP or hostname
+  const assets = await prisma.asset.findMany({
+    where: {
+      OR: [
+        { ip: { contains: query, mode: 'insensitive' } },
+        { hostname: { contains: query, mode: 'insensitive' } },
+        { identityKey: { contains: query, mode: 'insensitive' } }
+      ]
+    },
+    take,
+    select: { id: true, ip: true, hostname: true, identityKey: true }
+  });
+  for (const a of assets) {
+    results.push({
+      type: 'asset',
+      id: a.id,
+      title: a.ip ?? a.hostname ?? a.identityKey,
+      subtitle: a.hostname ? `${a.hostname} • ${a.identityKey}` : a.identityKey,
+      url: `/assets/${a.id}`
+    });
+  }
+
+  // Search scans by ID (partial match) or annotations
+  const scans = await prisma.scan.findMany({
+    where: {
+      OR: [
+        { id: { contains: query, mode: 'insensitive' } },
+        { request: { path: ['projectId'], string_contains: query } }
+      ]
+    },
+    take,
+    select: { id: true, status: true, projectId: true, createdAt: true }
+  });
+  for (const s of scans) {
+    results.push({
+      type: 'scan',
+      id: s.id,
+      title: `Scan ${s.id.slice(0, 8)}...`,
+      subtitle: `${s.status} • ${s.projectId} • ${s.createdAt.toISOString().split('T')[0]}`,
+      url: `/scans/${s.id}`
+    });
+  }
+
+  // Search imports by ID or source
+  const imports = await prisma.xmlImport.findMany({
+    where: {
+      OR: [
+        { id: { contains: query, mode: 'insensitive' } },
+        { source: { contains: query, mode: 'insensitive' } }
+      ]
+    },
+    take,
+    select: { id: true, source: true, createdAt: true }
+  });
+  for (const i of imports) {
+    results.push({
+      type: 'import',
+      id: i.id,
+      title: `Import ${i.id.slice(0, 8)}...`,
+      subtitle: `${i.source ?? 'unknown'} • ${i.createdAt.toISOString().split('T')[0]}`,
+      url: `/imports/${i.id}`
+    });
+  }
+
+  // Sort by relevance: exact matches first, then partial
+  const lowerQuery = query.toLowerCase();
+  results.sort((a, b) => {
+    const aExact = a.title.toLowerCase() === lowerQuery || a.id.toLowerCase() === lowerQuery;
+    const bExact = b.title.toLowerCase() === lowerQuery || b.id.toLowerCase() === lowerQuery;
+    if (aExact && !bExact) return -1;
+    if (bExact && !aExact) return 1;
+    return a.title.localeCompare(b.title);
+  });
+
+  return { results: results.slice(0, take), query };
 });
 
 app.get('/api/v1/network', async (req, reply) => {

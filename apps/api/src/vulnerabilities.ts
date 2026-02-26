@@ -236,14 +236,29 @@ export async function listVulnerabilities(filters: {
   importId?: string;
   assetId?: string;
   severity?: string;
+  assignedTo?: string;
+  remediationStatus?: string;
+  dueBefore?: string;
+  dueAfter?: string;
+  hasExploit?: boolean;
   limit?: number;
 }) {
+  const where: any = {
+    importId: filters.importId,
+    assetId: filters.assetId,
+    severity: filters.severity ? normalize(filters.severity) : undefined,
+    assignedTo: filters.assignedTo,
+    remediationStatus: filters.remediationStatus,
+  };
+
+  if (filters.dueBefore || filters.dueAfter) {
+    where.dueDate = {};
+    if (filters.dueBefore) where.dueDate.lte = new Date(filters.dueBefore);
+    if (filters.dueAfter) where.dueDate.gte = new Date(filters.dueAfter);
+  }
+
   const rows = await prisma.assetVulnerability.findMany({
-    where: {
-      importId: filters.importId,
-      assetId: filters.assetId,
-      severity: filters.severity ? normalize(filters.severity) : undefined
-    },
+    where,
     include: {
       asset: {
         select: {
@@ -259,17 +274,168 @@ export async function listVulnerabilities(filters: {
   });
 
   const includeExploits = (process.env.EXPLOIT_ENRICH_ENABLED ?? 'true').toLowerCase() !== 'false';
-  if (!includeExploits) return rows.map((r) => ({ ...r, exploitRefs: [] as ExploitRef[] }));
-
-  const enriched = await Promise.all(
+  
+  let enriched = await Promise.all(
     rows.map(async (r) => {
       const existing = Array.isArray(r.exploitRefs as unknown[]) ? (r.exploitRefs as unknown[] as ExploitRef[]) : [];
+      const exploitRefs = existing.length > 0 ? existing : (includeExploits ? await lookupExploitRefs(r.cve) : []);
+      const hasExploit = exploitRefs.length > 0;
       return {
         ...r,
-        exploitRefs: existing.length > 0 ? existing : await lookupExploitRefs(r.cve)
+        exploitRefs,
+        hasExploit,
+        exploitConfidence: hasExploit ? Math.max(...exploitRefs.map(e => e.confidence === 'high' ? 3 : e.confidence === 'medium' ? 2 : 1)) : 0
       };
     })
   );
 
+  // Filter by hasExploit if specified
+  if (filters.hasExploit !== undefined) {
+    enriched = enriched.filter(r => r.hasExploit === filters.hasExploit);
+  }
+
+  // Sort: exploitable first, then by confidence
+  enriched.sort((a, b) => {
+    if (a.hasExploit && !b.hasExploit) return -1;
+    if (!a.hasExploit && b.hasExploit) return 1;
+    return b.exploitConfidence - a.exploitConfidence;
+  });
+
   return enriched;
+}
+
+export async function getBlastRadius(cve: string) {
+  const vulns = await prisma.assetVulnerability.findMany({
+    where: { cve },
+    include: {
+      asset: {
+        select: {
+          id: true,
+          identityKey: true,
+          ip: true,
+          hostname: true,
+          serviceTags: true,
+          ports: true
+        }
+      }
+    }
+  });
+
+  const affectedAssets = vulns.map(v => v.asset);
+  const uniqueAssets = [...new Map(affectedAssets.map(a => [a.id, a])).values()];
+  
+  // Calculate severity breakdown
+  const severityCount = vulns.reduce((acc, v) => {
+    acc[v.severity] = (acc[v.severity] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Calculate service breakdown
+  const serviceBreakdown = uniqueAssets.reduce((acc, asset) => {
+    for (const tag of asset.serviceTags) {
+      acc[tag] = (acc[tag] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
+  return {
+    cve,
+    totalInstances: vulns.length,
+    affectedAssetCount: uniqueAssets.length,
+    severityBreakdown: severityCount,
+    serviceBreakdown,
+    assets: uniqueAssets.map(a => ({
+      id: a.id,
+      identityKey: a.identityKey,
+      ip: a.ip,
+      hostname: a.hostname
+    }))
+  };
+}
+
+export async function getExploitabilityStats(importId?: string) {
+  const where = importId ? { importId } : {};
+  
+  const allVulns = await prisma.assetVulnerability.findMany({
+    where,
+    select: { cve: true, exploitRefs: true, severity: true }
+  });
+
+  const withExploit = allVulns.filter(v => {
+    const refs = Array.isArray(v.exploitRefs) ? v.exploitRefs : [];
+    return refs.length > 0;
+  });
+
+  const withoutExploit = allVulns.filter(v => {
+    const refs = Array.isArray(v.exploitRefs) ? v.exploitRefs : [];
+    return refs.length === 0;
+  });
+
+  return {
+    total: allVulns.length,
+    withExploit: withExploit.length,
+    withoutExploit: withoutExploit.length,
+    bySeverity: {
+      exploitable: withExploit.reduce((acc, v) => {
+        acc[v.severity] = (acc[v.severity] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+      theoretical: withoutExploit.reduce((acc, v) => {
+        acc[v.severity] = (acc[v.severity] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>)
+    }
+  };
+}
+
+export async function updateVulnerability(
+  id: number,
+  updates: {
+    assignedTo?: string | null;
+    dueDate?: string | null;
+    remediationStatus?: 'open' | 'in_progress' | 'on_hold' | 'resolved';
+  }
+) {
+  const data: any = {};
+  if (updates.assignedTo !== undefined) data.assignedTo = updates.assignedTo;
+  if (updates.dueDate !== undefined) data.dueDate = updates.dueDate ? new Date(updates.dueDate) : null;
+  if (updates.remediationStatus !== undefined) data.remediationStatus = updates.remediationStatus;
+
+  const updated = await prisma.assetVulnerability.update({
+    where: { id },
+    data,
+    include: {
+      asset: {
+        select: {
+          id: true,
+          identityKey: true,
+          ip: true,
+          hostname: true
+        }
+      }
+    }
+  });
+
+  return updated;
+}
+
+export async function bulkUpdateVulnerabilities(
+  ids: number[],
+  updates: {
+    assignedTo?: string | null;
+    dueDate?: string | null;
+    remediationStatus?: 'open' | 'in_progress' | 'on_hold' | 'resolved';
+  }
+) {
+  const data: any = {};
+  if (updates.assignedTo !== undefined) data.assignedTo = updates.assignedTo;
+  if (updates.dueDate !== undefined) data.dueDate = updates.dueDate ? new Date(updates.dueDate) : null;
+  if (updates.remediationStatus !== undefined) data.remediationStatus = updates.remediationStatus;
+
+  const result = await prisma.assetVulnerability.updateMany({
+    where: { id: { in: ids } },
+    data
+  });
+
+  return { updated: result.count };
 }

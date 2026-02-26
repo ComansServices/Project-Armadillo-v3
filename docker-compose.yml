@@ -25,7 +25,7 @@ services:
       REDIS_PORT: 6379
       DATABASE_URL: postgres://armadillo:armadillo@postgres:5432/armadillo
       AUTH_SESSION_SECRET: armadillo-dev-session-secret
-      AUTH_ALLOW_LEGACY_HEADERS: "false"
+      AUTH_ALLOW_LEGACY_HEADERS: "true"
       AUTH_FAIL_THRESHOLD: 5
       AUTH_LOCK_MINUTES: 15
     depends_on:

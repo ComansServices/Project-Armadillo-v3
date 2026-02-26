@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ReactNode } from 'react';
+import { GlobalSearch } from './global-search';
 
 const navItems = [
   { href: '/', label: 'Overview' },
@@ -81,6 +82,8 @@ export function AppShell({
       </div>
 
       {children}
+
+      <GlobalSearch />
 
       <style>{`
         :where(button, input, select, textarea) {

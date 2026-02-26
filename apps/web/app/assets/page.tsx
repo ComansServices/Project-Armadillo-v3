@@ -1,5 +1,8 @@
 import Link from 'next/link';
 import { AppShell } from '../_components/app-shell';
+import { AssetBadge } from '../_components/asset-badge';
+
+type AssetBadge = { badge: 'new' | 'new_this_week' | 'changed' | null; tooltip?: string };
 
 type AssetRecord = {
   id: string;
@@ -15,6 +18,7 @@ type AssetRecord = {
   firstSeenAt: string;
   lastSeenAt: string;
   createdAt: string;
+  badge?: AssetBadge;
 };
 
 type AssetFilters = { ip?: string; hostname?: string; tag?: string; source?: string };
@@ -30,6 +34,7 @@ const authHeaders = {
 async function getAssets(filters: AssetFilters): Promise<AssetRecord[]> {
   const qs = new URLSearchParams();
   qs.set('limit', '100');
+  qs.set('badges', 'true');
   if (filters.ip) qs.set('ip', filters.ip);
   if (filters.hostname) qs.set('hostname', filters.hostname);
   if (filters.tag) qs.set('tag', filters.tag);
@@ -82,14 +87,14 @@ export default async function AssetsPage({
         <table style={{ borderCollapse: 'collapse', minWidth: 1100, width: '100%' }}>
           <thead>
             <tr>
-              {['Asset', 'Identity Key', 'IP', 'Hostname', 'Ports', 'Tags', 'Seen', 'Last Seen', 'Import', 'Actions'].map((h) => (
+              {['Asset', 'Identity Key', 'IP', 'Hostname', 'Ports', 'Tags', 'Seen', 'Last Seen', 'Import', 'Status', 'Actions'].map((h) => (
                 <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {assets.length === 0 ? (
-              <tr><td colSpan={10} style={{ padding: '12px 10px', color: '#666' }}>No assets matched current filters.</td></tr>
+              <tr><td colSpan={11} style={{ padding: '12px 10px', color: '#666' }}>No assets matched current filters.</td></tr>
             ) : assets.map((a) => (
               <tr key={a.id}>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{a.id}</td>
@@ -101,6 +106,9 @@ export default async function AssetsPage({
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.seenCount}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{new Date(a.lastSeenAt).toLocaleString()}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{a.importId}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
+                  {a.badge && <AssetBadge badge={a.badge.badge} tooltip={a.badge.tooltip} />}
+                </td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
                   <Link href={`/assets/${a.id}`}>Open</Link>
                 </td>

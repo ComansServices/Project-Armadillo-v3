@@ -42,6 +42,63 @@ type LegacyAssetRow = {
   last_seen_at: Date;
 };
 
+export function getAssetBadge(asset: {
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+  deltaSinceLast: Prisma.JsonValue | null;
+}): { badge: 'new' | 'new_this_week' | 'changed' | null; tooltip?: string } {
+  const now = new Date();
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  // Check for changes first (most specific)
+  const delta = asset.deltaSinceLast as {
+    addedPorts?: number[];
+    removedPorts?: number[];
+    addedServices?: string[];
+    removedServices?: string[];
+  } | null;
+
+  if (delta && (delta.addedPorts?.length || delta.removedPorts?.length || delta.addedServices?.length || delta.removedServices?.length)) {
+    const changes: string[] = [];
+    if (delta.addedPorts?.length) changes.push(`+${delta.addedPorts.length} ports`);
+    if (delta.removedPorts?.length) changes.push(`-${delta.removedPorts.length} ports`);
+    if (delta.addedServices?.length) changes.push(`+${delta.addedServices.length} services`);
+    if (delta.removedServices?.length) changes.push(`-${delta.removedServices.length} services`);
+    return { badge: 'changed', tooltip: changes.join(', ') };
+  }
+
+  // Check if new (first seen today)
+  if (asset.firstSeenAt >= oneDayAgo) {
+    return { badge: 'new', tooltip: `First seen today` };
+  }
+
+  // Check if new this week
+  if (asset.firstSeenAt >= oneWeekAgo) {
+    return { badge: 'new_this_week', tooltip: `First seen this week` };
+  }
+
+  return { badge: null };
+}
+
+export async function listAssetsWithBadges(limit = 50, filters: ListAssetFilters = {}) {
+  const assets = await prisma.asset.findMany({
+    where: {
+      ip: filters.ip ? { contains: filters.ip, mode: 'insensitive' } : undefined,
+      hostname: filters.hostname ? { contains: filters.hostname, mode: 'insensitive' } : undefined,
+      sourceType: filters.source ? { equals: filters.source, mode: 'insensitive' } : undefined,
+      serviceTags: filters.tag ? { has: filters.tag } : undefined
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit
+  });
+
+  return assets.map(asset => ({
+    ...asset,
+    badge: getAssetBadge(asset)
+  }));
+}
+
 export async function backfillAssetIdentityKeys() {
   const rows = await prisma.$queryRaw<LegacyAssetRow[]>`
     SELECT
