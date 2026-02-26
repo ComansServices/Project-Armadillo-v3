@@ -2,7 +2,7 @@
 
 Date: 2026-02-26
 Owner: Comans / Leo
-Status: U1 delivered (foundations complete); U2 queued
+Status: U1 delivered; U2 delivered (core workflows + triage pages complete); U3 queued
 
 ## Objective
 Improve operator speed, comprehension, and confidence by modernizing page structure, action hierarchy, and helper guidance across desktop + mobile.
@@ -109,9 +109,12 @@ Grouping:
 - Button hierarchy normalization
 - Standard page headers + helper text pattern
 
-### U2 — Core Workflow Pages (3–4 days)
-- Overview, Scans, Imports, Assets UX refactor
-- Mobile responsiveness + table/card fallbacks
+### U2 — Core Workflow Pages (3–4 days) ✅ Complete
+- Overview, Imports, Assets UX refactor completed
+- Vulnerabilities, Network, Schedules interaction pass completed
+- Mobile responsiveness + table/card fallbacks completed across heavy-data pages
+- Consolidation pass completed (shared control styling in app shell)
+- Full desktop/mobile regression pack executed and captured
 
 ### U3 — Analysis Pages (2–3 days)
 - Vulnerability triage UX
@@ -131,5 +134,16 @@ Grouping:
 - Fewer operator clarification questions
 - Positive owner/operator qualitative feedback
 
+## U2 Closure Evidence (2026-02-26)
+- Commits:
+  - `1a50ef4` — U2 slice 1 (Overview/Imports/Assets)
+  - `ef6d61e` — U2 continuation (Vulns/Schedules/Network)
+  - `bd9791d` — consolidation pass (shared control styling)
+  - `32c1db5` — final polish (mobile topology readability, imports policy density, overview row-density control)
+- Visual regression coverage:
+  - Desktop: `/`, `/imports`, `/assets`, `/vulns`, `/network`, `/schedules`, `/reports`, `/dashboard`
+  - Mobile: `/`, `/imports`, `/assets`, `/vulns`, `/network`, `/schedules`
+- Captured screenshots are stored under `.openclaw/media/browser/*` during QA runs.
+
 ## Immediate Next Step
-Kick off U1 with component scaffold and redesign of Overview + Scans as first review milestone.
+Proceed to U3 analysis-page enhancement backlog (legend/mode affordances on network, vuln triage density controls, reports UX cleanup).

@@ -1,12 +1,15 @@
 # Armadillo v3 — Ops Register
 
-Last updated: 2026-02-26 19:19 AEDT
+Last updated: 2026-02-26 20:03 AEDT
 Owner: Comans / Leo
 
 ## Current Program Status
 - Phase 4 Beta Hardening: Complete (GO)
 - Phase 5 Legacy Parity: Complete (Items 1–6 done)
-- Current Focus: Post-parity usability modernization (Phase 6 planning)
+- Phase 6 Usability Modernization:
+  - U1 Foundations: Complete
+  - U2 Core Workflow + Triage Pass: Complete
+  - U3 Analysis-page enhancement: Next
 
 ## Completed Milestones (latest)
 1. Item 2 Network parity complete + desktop/mobile usability fixes
@@ -16,6 +19,9 @@ Owner: Comans / Leo
 5. Item 6 Auth hardening complete (signed session path + scope + lockout/audit)
 6. Prod hardening pass complete in stack config (`AUTH_ALLOW_LEGACY_HEADERS=false`)
 7. Usability Phase U1 complete (shared app shell/nav, button-first actions, helper text framework across core pages)
+8. Usability Phase U2 complete (overview/imports/assets + vulns/network/schedules interaction passes, mobile card fallbacks)
+9. U2 consolidation complete (global control styling normalization)
+10. U2 final polish complete (mobile topology readability, import policy layout density, overview row-count control)
 
 ## Operational Security Posture (current)
 - Signed session auth enabled for API
@@ -30,12 +36,12 @@ Owner: Comans / Leo
   - Action: phase after parity (provider integration + session UX)
 
 ## Next Actions (approved)
-1. Execute Usability + Modern UI Phase U2 (core workflow refinements)
-2. Redesign Scans + Imports + Assets interactions for faster triage
-3. Add mobile table/card fallbacks on core workflow pages
-4. Run breakpoint QA and present before/after pack
+1. Execute Phase 6 U3 analysis-page enhancement backlog (network affordances + vuln triage density + reports UX cleanup)
+2. Prepare Phase 6 release sign-off pack (before/after summary + decisions + residual polish items)
+3. Plan auth next increment discovery (interactive OIDC/SAML UX + token/secret rotation strategy)
 
 ## Change Log (today)
 - Added `docs/phase6-usability-modern-ui-plan.md`
 - Updated parity and auth-hardening completion status
 - Registered transition from feature parity to usability modernization
+- Marked Phase 6 U2 complete and logged regression + polish evidence (`1a50ef4`, `ef6d61e`, `bd9791d`, `32c1db5`)
