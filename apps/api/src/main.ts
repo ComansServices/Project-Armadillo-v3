@@ -704,7 +704,7 @@ app.get('/api/v1/reports/imports/:importId.pdf', async (req, reply) => {
     .slice(0, reportAudience === 'exec' ? 8 : 15)
     .map((f) => `[${String(f.severity).toUpperCase()}] ${f.cve} ${f.asset.identityKey} ${f.title ?? ''}`.trim());
 
-  const pdf = buildBrandedReportPdf({
+  const pdf = await buildBrandedReportPdf({
     title: 'Armadillo Import Report',
     subtitle: `Import ${importRow.id}`,
     audience: reportAudience,
@@ -789,7 +789,7 @@ app.get('/api/v1/reports/scans/:scanId.pdf', async (req, reply) => {
     .slice(0, reportAudience === 'exec' ? 8 : 20)
     .map((e) => `${e.createdAt.toISOString()} | ${e.stage ?? '-'} | ${e.status ?? '-'} | ${e.message ?? '-'}`);
 
-  const pdf = buildBrandedReportPdf({
+  const pdf = await buildBrandedReportPdf({
     title: 'Armadillo Scan Report',
     subtitle: `Scan ${scan.id}`,
     audience: reportAudience,

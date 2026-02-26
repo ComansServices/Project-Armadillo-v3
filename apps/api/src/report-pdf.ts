@@ -1,155 +1,89 @@
-function escapePdfText(input: string) {
-  return input.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-}
+import path from 'node:path';
+import PDFDocument from 'pdfkit';
 
-function wrapLine(input: string, maxChars = 95) {
+function wrapLine(input: string, maxChars = 110) {
   const words = input.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = '';
-
   for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (candidate.length > maxChars) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxChars) {
       if (current) lines.push(current);
       current = word;
     } else {
-      current = candidate;
+      current = next;
     }
   }
-
   if (current) lines.push(current);
   return lines.length ? lines : [''];
 }
 
-export function buildSimpleTextPdf(title: string, lines: string[]) {
-  const contentLines = [title, '', ...lines].slice(0, 180);
-  let y = 790;
-  const chunks: string[] = ['BT', '/F1 12 Tf'];
-
-  for (const line of contentLines) {
-    chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText(line)}) Tj`);
-    y -= 16;
-    if (y < 40) break;
-  }
-  chunks.push('ET');
-
-  const stream = chunks.join('\n');
-
-  const objects: string[] = [];
-  objects.push('1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj');
-  objects.push('2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj');
-  objects.push('3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj');
-  objects.push('4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj');
-  objects.push(`5 0 obj << /Length ${Buffer.byteLength(stream, 'utf8')} >> stream\n${stream}\nendstream endobj`);
-
-  let body = '%PDF-1.4\n';
-  const xref: number[] = [0];
-
-  for (const obj of objects) {
-    xref.push(Buffer.byteLength(body, 'utf8'));
-    body += `${obj}\n`;
-  }
-
-  const xrefStart = Buffer.byteLength(body, 'utf8');
-  body += `xref\n0 ${objects.length + 1}\n`;
-  body += '0000000000 65535 f \n';
-  for (let i = 1; i < xref.length; i += 1) {
-    body += `${String(xref[i]).padStart(10, '0')} 00000 n \n`;
-  }
-  body += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-
-  return Buffer.from(body, 'utf8');
+function renderToBuffer(doc: any) {
+  return new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    doc.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    doc.end();
+  });
 }
 
-export function buildBrandedReportPdf(options: {
+export async function buildSimpleTextPdf(title: string, lines: string[]) {
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  doc.fontSize(16).text(title, { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(11);
+  for (const line of lines.slice(0, 220)) doc.text(line);
+  return renderToBuffer(doc);
+}
+
+export async function buildBrandedReportPdf(options: {
   title: string;
   subtitle?: string;
   audience?: 'ops' | 'exec';
   generatedAt?: string;
   sections: Array<{ heading: string; lines: string[] }>;
 }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
   const generatedAt = options.generatedAt ?? new Date().toISOString();
   const audience = options.audience ?? 'ops';
 
-  let y = 800;
-  const chunks: string[] = ['BT'];
+  const brandRed = '#b92128';
+  const brandSlate = '#3d4e5c';
 
-  // Header block using Comans site palette
-  // primary red: #b92128  => 0.725 0.129 0.157
-  // slate: #3d4e5c        => 0.239 0.306 0.361
-  chunks.push('0.725 0.129 0.157 rg');
-  chunks.push('/F1 24 Tf');
-  chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText('COMANS')}) Tj`);
-  chunks.push('/F1 10 Tf');
-  chunks.push(`1 0 0 1 136 ${y + 2} Tm (${escapePdfText('SERVICES')}) Tj`);
-  y -= 28;
+  const logoPath = path.resolve(process.cwd(), 'apps/api/assets/comans-logo.png');
+  try {
+    doc.image(logoPath, 40, 28, { fit: [140, 48], align: 'left', valign: 'top' });
+  } catch {
+    doc.fillColor(brandRed).fontSize(22).text('COMANS', 40, 34);
+    doc.fontSize(10).text('SERVICES', 135, 40);
+  }
 
-  chunks.push('0.239 0.306 0.361 rg');
-  chunks.push('/F1 16 Tf');
-  chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText(options.title)}) Tj`);
-  y -= 20;
+  doc.fillColor(brandSlate).fontSize(17).text(options.title, 40, 88);
+  doc.fontSize(11).text(options.subtitle ?? (audience === 'exec' ? 'Executive summary view' : 'Operations detail view'), 40, 110);
+  doc.fontSize(9).fillColor('#55606b').text(`Generated ${generatedAt}`, 40, 126);
+  doc.moveTo(40, 142).lineTo(555, 142).strokeColor('#d1d5db').stroke();
 
-  chunks.push('/F1 11 Tf');
-  const subtitle = options.subtitle ?? (audience === 'exec' ? 'Executive summary view' : 'Operations detail view');
-  chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText(subtitle)}) Tj`);
-  y -= 16;
-  chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText(`Generated ${generatedAt}`)}) Tj`);
-  y -= 14;
-  chunks.push('/F1 9 Tf');
-  chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText('Brand source: comansservices.com.au • logo: /images/comansservices-logo-w.svg')}) Tj`);
-  y -= 16;
-
+  let y = 152;
   for (const section of options.sections.slice(0, 12)) {
-    if (y < 80) break;
+    if (y > 760) break;
+    doc.fillColor(brandRed).fontSize(13).text(section.heading, 40, y);
+    y = doc.y + 2;
 
-    chunks.push('0.725 0.129 0.157 rg');
-    chunks.push('/F1 13 Tf');
-    chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText(section.heading)}) Tj`);
-    y -= 16;
-
-    chunks.push('0.239 0.306 0.361 rg');
-    chunks.push('/F1 11 Tf');
+    doc.fillColor(brandSlate).fontSize(10);
     for (const line of section.lines.slice(0, 60)) {
-      const wrapped = wrapLine(line, 92);
-      for (const w of wrapped) {
-        if (y < 65) break;
-        chunks.push(`1 0 0 1 52 ${y} Tm (${escapePdfText(w)}) Tj`);
-        y -= 14;
+      for (const wrapped of wrapLine(line, 112)) {
+        if (y > 770) break;
+        doc.text(`• ${wrapped}`, 52, y, { width: 500, lineGap: 1 });
+        y = doc.y + 1;
       }
-      if (y < 65) break;
+      if (y > 770) break;
     }
 
-    y -= 8;
+    y += 8;
   }
 
-  chunks.push('/F1 10 Tf');
-  chunks.push(`1 0 0 1 40 34 Tm (${escapePdfText(`Audience: ${audience.toUpperCase()} • Internal Confidential`)}) Tj`);
-  chunks.push('ET');
+  doc.fillColor('#6b7280').fontSize(9).text(`Audience: ${audience.toUpperCase()} • Internal Confidential`, 40, 805);
 
-  const stream = chunks.join('\n');
-
-  const objects: string[] = [];
-  objects.push('1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj');
-  objects.push('2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj');
-  objects.push('3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj');
-  objects.push('4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj');
-  objects.push(`5 0 obj << /Length ${Buffer.byteLength(stream, 'utf8')} >> stream\n${stream}\nendstream endobj`);
-
-  let body = '%PDF-1.4\n';
-  const xref: number[] = [0];
-
-  for (const obj of objects) {
-    xref.push(Buffer.byteLength(body, 'utf8'));
-    body += `${obj}\n`;
-  }
-
-  const xrefStart = Buffer.byteLength(body, 'utf8');
-  body += `xref\n0 ${objects.length + 1}\n`;
-  body += '0000000000 65535 f \n';
-  for (let i = 1; i < xref.length; i += 1) {
-    body += `${String(xref[i]).padStart(10, '0')} 00000 n \n`;
-  }
-  body += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-
-  return Buffer.from(body, 'utf8');
+  return renderToBuffer(doc);
 }
