@@ -75,6 +75,12 @@ export default async function VulnsPage({
     return (sevRank[b.severity.toLowerCase()] ?? 0) - (sevRank[a.severity.toLowerCase()] ?? 0);
   });
 
+  const sevCounts = sorted.reduce<Record<string, number>>((acc, f) => {
+    const k = f.severity.toLowerCase();
+    acc[k] = (acc[k] ?? 0) + 1;
+    return acc;
+  }, {});
+
   const exportQs = new URLSearchParams();
   if (filters.importId) exportQs.set('importId', filters.importId);
   if (filters.severity) exportQs.set('severity', filters.severity);
@@ -98,8 +104,8 @@ export default async function VulnsPage({
     >
       <p style={{ marginTop: 0 }}>CVE/CPE enrichment results from import assets. CSV export includes source and description fields for analyst handoff.</p>
 
-      <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input name="importId" placeholder="Filter import ID" defaultValue={filters.importId ?? ''} style={{ minWidth: 360 }} />
+      <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input name="importId" placeholder="Filter import ID" defaultValue={filters.importId ?? ''} style={{ minWidth: 220, width: 'min(100%, 360px)' }} />
         <select name="severity" defaultValue={filters.severity ?? ''}>
           <option value="">All severities</option>
           <option value="critical">critical</option>
@@ -121,6 +127,13 @@ export default async function VulnsPage({
         <a href={`${publicApiBaseUrl}/api/v1/vulns?${exportQs.toString()}`}>Export CSV</a>
       </form>
 
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 110 }}><strong>Critical</strong><div>{sevCounts.critical ?? 0}</div></div>
+        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 110 }}><strong>High</strong><div>{sevCounts.high ?? 0}</div></div>
+        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 110 }}><strong>Medium</strong><div>{sevCounts.medium ?? 0}</div></div>
+        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 110 }}><strong>Low</strong><div>{sevCounts.low ?? 0}</div></div>
+      </div>
+
       {groupOrder.map((g) => (
         <section key={g} style={{ marginBottom: 18 }}>
           {group === 'severity' ? (
@@ -128,43 +141,26 @@ export default async function VulnsPage({
               {g} ({grouped[g].length})
             </h3>
           ) : null}
-          <div style={{ overflowX: 'auto' }}>
+
+          <div className="desktop-table" style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: 1200, width: '100%' }}>
               <thead>
                 <tr>
                   {['Detected', 'Severity', 'CVE', 'CVSS', 'CPE', 'Exploits', 'Asset', 'Import', 'Title'].map((h) => (
-                    <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
-                      {h}
-                    </th>
+                    <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {grouped[g].length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ padding: '12px 10px', color: '#666' }}>No findings for current filters.</td>
-                  </tr>
+                  <tr><td colSpan={9} style={{ padding: '12px 10px', color: '#666' }}>No findings for current filters.</td></tr>
                 ) : (
                   grouped[g].map((f) => (
                     <tr key={f.id}>
                       <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{new Date(f.detectedAt).toLocaleString()}</td>
                       <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                        <span
-                          style={{
-                            ...sevStyle(f.severity),
-                            padding: '2px 10px',
-                            borderRadius: 999,
-                            textTransform: 'uppercase',
-                            fontSize: 12,
-                            fontWeight: 700,
-                            letterSpacing: 0.4,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6
-                          }}
-                        >
-                          <span aria-hidden="true">●</span>
-                          {f.severity}
+                        <span style={{ ...sevStyle(f.severity), padding: '2px 10px', borderRadius: 999, textTransform: 'uppercase', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <span aria-hidden="true">●</span>{f.severity}
                         </span>
                       </td>
                       <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{f.cve}</td>
@@ -174,21 +170,13 @@ export default async function VulnsPage({
                         {f.exploitRefs && f.exploitRefs.length > 0 ? (
                           <div style={{ display: 'grid', gap: 4 }}>
                             {f.exploitRefs.slice(0, 2).map((r) => (
-                              <a key={`${f.id}-${r.source}-${r.id}`} href={r.url} target="_blank" rel="noreferrer">
-                                {r.source}:{r.id}
-                              </a>
+                              <a key={`${f.id}-${r.source}-${r.id}`} href={r.url} target="_blank" rel="noreferrer">{r.source}:{r.id}</a>
                             ))}
                           </div>
-                        ) : (
-                          '-'
-                        )}
+                        ) : '-'}
                       </td>
-                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                        <Link href={`/assets/${f.asset.id}`}>{f.asset.identityKey}</Link>
-                      </td>
-                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                        <Link href={`/imports/${f.importId}`}>{f.importId}</Link>
-                      </td>
+                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}><Link href={`/assets/${f.asset.id}`}>{f.asset.identityKey}</Link></td>
+                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}><Link href={`/imports/${f.importId}`}>{f.importId}</Link></td>
                       <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{f.title ?? '-'}</td>
                     </tr>
                   ))
@@ -196,8 +184,33 @@ export default async function VulnsPage({
               </tbody>
             </table>
           </div>
+
+          <div className="mobile-cards" style={{ display: 'none', gap: 8 }}>
+            {grouped[g].map((f) => (
+              <article key={`m-${f.id}`} style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, background: '#fff' }}>
+                <p style={{ margin: '0 0 6px 0' }}>
+                  <span style={{ ...sevStyle(f.severity), padding: '2px 9px', borderRadius: 999, textTransform: 'uppercase', fontSize: 11, fontWeight: 700 }}>{f.severity}</span>
+                </p>
+                <p style={{ margin: '0 0 4px 0', fontFamily: 'monospace' }}>{f.cve}</p>
+                <p style={{ margin: '0 0 4px 0', color: '#475569', fontSize: 12 }}>{new Date(f.detectedAt).toLocaleString()}</p>
+                <p style={{ margin: '0 0 4px 0' }}><strong>Asset:</strong> {f.asset.identityKey}</p>
+                <p style={{ margin: '0 0 8px 0' }}><strong>Title:</strong> {f.title ?? '-'}</p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <Link href={`/assets/${f.asset.id}`}>Open asset</Link>
+                  <Link href={`/imports/${f.importId}`}>Open import</Link>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
       ))}
+
+      <style>{`
+        @media (max-width: 1100px) {
+          .desktop-table { display: none; }
+          .mobile-cards { display: grid !important; }
+        }
+      `}</style>
     </AppShell>
   );
 }

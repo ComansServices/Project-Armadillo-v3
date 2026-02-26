@@ -270,7 +270,7 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
       </div>
 
       <h2 style={{ marginBottom: 8 }}>Assets</h2>
-      <div style={{ overflowX: 'auto' }}>
+      <div className="desktop-table" style={{ overflowX: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', minWidth: 1100, width: '100%' }}>
           <thead>
             <tr>{['Identity', 'Import', 'IP', 'Hostname', 'Ports', 'Services'].map((h) => <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>{h}</th>)}</tr>
@@ -301,6 +301,35 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
           </tbody>
         </table>
       </div>
+
+      <div className="mobile-cards" style={{ display: 'none', gap: 8 }}>
+        {assets.slice(0, 80).map((a) => {
+          const meta = a.meta ?? {};
+          const ports = Array.isArray(meta.ports) ? meta.ports.join(', ') : '-';
+          const tags = Array.isArray(meta.serviceTags) ? meta.serviceTags.join(', ') : '-';
+          const ip = typeof meta.ip === 'string' ? meta.ip : '-';
+          const assetId = a.id.replace('asset:', '');
+          return (
+            <article key={`m-${a.id}`} style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, background: '#fff' }}>
+              <p style={{ margin: '0 0 4px 0' }}><strong>{a.label}</strong></p>
+              <p style={{ margin: '0 0 4px 0' }}><strong>IP:</strong> {ip}</p>
+              <p style={{ margin: '0 0 4px 0' }}><strong>Ports:</strong> {ports || '-'}</p>
+              <p style={{ margin: '0 0 8px 0' }}><strong>Services:</strong> {tags || '-'}</p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <Link href={`/assets/${assetId}`}>Open asset</Link>
+                <Link href={`/network?layout=${layout}&importId=${encodeURIComponent(importId)}&subnet=${encodeURIComponent(subnet)}&service=${encodeURIComponent(service)}&port=${encodeURIComponent(port)}&node=${encodeURIComponent(a.id)}`}>Inspect node</Link>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <style>{`
+        @media (max-width: 980px) {
+          .desktop-table { display: none; }
+          .mobile-cards { display: grid !important; }
+        }
+      `}</style>
     </AppShell>
   );
 }

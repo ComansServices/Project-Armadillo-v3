@@ -1,5 +1,4 @@
 import { revalidatePath } from 'next/cache';
-import Link from 'next/link';
 import { AppShell } from '../_components/app-shell';
 import { redirect } from 'next/navigation';
 
@@ -65,20 +64,14 @@ async function toggleScheduleAction(formData: FormData) {
   'use server';
   const id = String(formData.get('id') ?? '');
   if (!id) return;
-  await fetch(`${baseUrl}/api/v1/scan-schedules/${id}/toggle`, {
-    method: 'POST',
-    headers: writeHeaders
-  });
+  await fetch(`${baseUrl}/api/v1/scan-schedules/${id}/toggle`, { method: 'POST', headers: writeHeaders });
   revalidatePath('/schedules');
   redirect('/schedules');
 }
 
 async function runDueAction() {
   'use server';
-  await fetch(`${baseUrl}/api/v1/scan-schedules/run-due`, {
-    method: 'POST',
-    headers: writeHeaders
-  });
+  await fetch(`${baseUrl}/api/v1/scan-schedules/run-due`, { method: 'POST', headers: writeHeaders });
   revalidatePath('/schedules');
   redirect('/schedules?ran=1');
 }
@@ -108,34 +101,32 @@ export default async function SchedulesPage({ searchParams }: { searchParams?: P
       {error ? <p style={{ color: '#a61b1b' }}>Save failed (HTTP {error}).</p> : null}
       {!canEditSchedules ? <p style={{ color: '#666' }}>Schedule editor is read-only for current web actor role.</p> : null}
 
-      <form action={canEditSchedules ? createScheduleAction : undefined} style={{ display: 'grid', gap: 8, maxWidth: 720, marginBottom: 12 }}>
+      <form action={canEditSchedules ? createScheduleAction : undefined} style={{ display: 'grid', gap: 8, maxWidth: 760, marginBottom: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))' }}>
         <input name="name" placeholder="Schedule name" required disabled={!canEditSchedules} />
-        <input name="cronExpr" placeholder="Cron expr (e.g. 0 2 * * *)" required disabled={!canEditSchedules} />
+        <input name="cronExpr" placeholder="Cron expr (e.g. 0 * * * *)" required disabled={!canEditSchedules} />
         <input name="timezone" defaultValue="Australia/Melbourne" required disabled={!canEditSchedules} />
         <input name="projectId" defaultValue="proj-001" required disabled={!canEditSchedules} />
         <input name="requestedBy" defaultValue="web-ui" required disabled={!canEditSchedules} />
         <input name="target" defaultValue="127.0.0.1" required disabled={!canEditSchedules} />
-        <button type="submit" disabled={!canEditSchedules}>Create schedule</button>
-      </form>
-      <form action={canEditSchedules ? runDueAction : undefined} style={{ marginBottom: 20 }}>
-        <button type="submit" disabled={!canEditSchedules}>Run due schedules now</button>
+        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8 }}>
+          <button type="submit" disabled={!canEditSchedules}>Create schedule</button>
+          <button formAction={canEditSchedules ? runDueAction : undefined} type="submit" disabled={!canEditSchedules}>Run due now</button>
+        </div>
       </form>
 
-      <div style={{ overflowX: 'auto' }}>
+      <div className="desktop-table" style={{ overflowX: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', minWidth: 900, width: '100%' }}>
           <thead>
-            <tr>{['Name', 'Cron', 'TZ', 'Project', 'RequestedBy', 'Next Run', 'Last Run', 'Last Status', 'Enabled', 'Action'].map((h) => <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>{h}</th>)}</tr>
+            <tr>{['Name', 'Cron', 'Project', 'Next Run', 'Last Run', 'Last Status', 'Enabled', 'Action'].map((h) => <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>{h}</th>)}</tr>
           </thead>
           <tbody>
             {schedules.length === 0 ? (
-              <tr><td colSpan={10} style={{ padding: '12px 10px', color: '#666' }}>No schedules yet.</td></tr>
+              <tr><td colSpan={8} style={{ padding: '12px 10px', color: '#666' }}>No schedules yet.</td></tr>
             ) : schedules.map((s) => (
               <tr key={s.id}>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.name}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{s.cronExpr}</td>
-                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.timezone}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.projectId}</td>
-                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.requestedBy}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : '-'}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : '-'}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }} title={s.lastRunMessage ?? ''}>{s.lastRunStatus ?? '-'}</td>
@@ -151,6 +142,29 @@ export default async function SchedulesPage({ searchParams }: { searchParams?: P
           </tbody>
         </table>
       </div>
+
+      <div className="mobile-cards" style={{ display: 'none', gap: 8 }}>
+        {schedules.length === 0 ? <p style={{ color: '#666' }}>No schedules yet.</p> : schedules.map((s) => (
+          <article key={`m-${s.id}`} style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, background: '#fff' }}>
+            <p style={{ margin: '0 0 6px 0' }}><strong>{s.name}</strong></p>
+            <p style={{ margin: '0 0 4px 0', fontFamily: 'monospace' }}>{s.cronExpr}</p>
+            <p style={{ margin: '0 0 4px 0' }}><strong>Project:</strong> {s.projectId}</p>
+            <p style={{ margin: '0 0 4px 0' }}><strong>Next:</strong> {s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : '-'}</p>
+            <p style={{ margin: '0 0 8px 0' }}><strong>Status:</strong> {s.lastRunStatus ?? '-'} ({s.enabled ? 'enabled' : 'disabled'})</p>
+            <form action={canEditSchedules ? toggleScheduleAction : undefined}>
+              <input type="hidden" name="id" value={s.id} />
+              <button type="submit" disabled={!canEditSchedules}>{s.enabled ? 'Disable' : 'Enable'}</button>
+            </form>
+          </article>
+        ))}
+      </div>
+
+      <style>{`
+        @media (max-width: 980px) {
+          .desktop-table { display: none; }
+          .mobile-cards { display: grid !important; }
+        }
+      `}</style>
     </AppShell>
   );
 }
