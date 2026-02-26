@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import { scanQueue } from './queue';
 import { createScan, getScan, listScans, listScanEvents } from './store';
@@ -56,6 +58,41 @@ function mergeCounts(base: Record<string, number>, next: Record<string, number>)
   const out: Record<string, number> = { ...base };
   for (const [k, v] of Object.entries(next)) out[k] = (out[k] ?? 0) + v;
   return out;
+}
+
+const reportArchiveDir = path.resolve(process.cwd(), 'apps/api/reports/archive');
+
+async function archiveReport(params: {
+  kind: 'import' | 'scan';
+  refId: string;
+  audience: 'ops' | 'exec';
+  pdf: Buffer;
+  requestedBy: string;
+}) {
+  await mkdir(reportArchiveDir, { recursive: true });
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  const base = `${params.kind}-${params.refId}-${params.audience}-${ts}`;
+  const pdfName = `${base}.pdf`;
+  const metaName = `${base}.json`;
+
+  await writeFile(path.join(reportArchiveDir, pdfName), params.pdf);
+  await writeFile(
+    path.join(reportArchiveDir, metaName),
+    JSON.stringify(
+      {
+        kind: params.kind,
+        refId: params.refId,
+        audience: params.audience,
+        requestedBy: params.requestedBy,
+        createdAt: new Date().toISOString(),
+        file: pdfName
+      },
+      null,
+      2
+    )
+  );
+
+  return { pdfName, metaName };
 }
 
 app.get('/health', async () => ({ ok: true, service: 'armadillo-api' }));
@@ -657,11 +694,31 @@ app.get('/api/v1/assets/:assetId/vulns', async (req, reply) => {
   return { findings: rows };
 });
 
+app.get('/api/v1/reports', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+  await mkdir(reportArchiveDir, { recursive: true });
+  const files = await readdir(reportArchiveDir);
+  const metaFiles = files.filter((f) => f.endsWith('.json')).sort().reverse().slice(0, 200);
+
+  const reports = [] as Array<Record<string, unknown>>;
+  for (const file of metaFiles) {
+    try {
+      const raw = await readFile(path.join(reportArchiveDir, file), 'utf8');
+      reports.push(JSON.parse(raw));
+    } catch {
+      // ignore bad metadata
+    }
+  }
+
+  return { reports };
+});
+
 app.get('/api/v1/reports/imports/:importId.pdf', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
   const { importId } = req.params as { importId: string };
-  const { againstImportId, audience } = req.query as { againstImportId?: string; audience?: string };
+  const { againstImportId, audience, archive } = req.query as { againstImportId?: string; audience?: string; archive?: string };
   const reportAudience: 'ops' | 'exec' = audience === 'exec' ? 'exec' : 'ops';
 
   const importRow = await prisma.xmlImport.findUnique({ where: { id: importId } });
@@ -749,6 +806,10 @@ app.get('/api/v1/reports/imports/:importId.pdf', async (req, reply) => {
     ]
   });
 
+  if (archive === '1' || archive === 'true') {
+    await archiveReport({ kind: 'import', refId: importId, audience: reportAudience, pdf, requestedBy: actor.actorId });
+  }
+
   reply.header('content-type', 'application/pdf');
   reply.header('content-disposition', `attachment; filename="armadillo-import-report-${importId}-${reportAudience}.pdf"`);
   return reply.send(pdf);
@@ -758,7 +819,7 @@ app.get('/api/v1/reports/scans/:scanId.pdf', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
   const { scanId } = req.params as { scanId: string };
-  const { againstScanId, audience } = req.query as { againstScanId?: string; audience?: string };
+  const { againstScanId, audience, archive } = req.query as { againstScanId?: string; audience?: string; archive?: string };
   const reportAudience: 'ops' | 'exec' = audience === 'exec' ? 'exec' : 'ops';
 
   const scan = await prisma.scan.findUnique({ where: { id: scanId } });
@@ -844,6 +905,10 @@ app.get('/api/v1/reports/scans/:scanId.pdf', async (req, reply) => {
       }
     ]
   });
+
+  if (archive === '1' || archive === 'true') {
+    await archiveReport({ kind: 'scan', refId: scanId, audience: reportAudience, pdf, requestedBy: actor.actorId });
+  }
 
   reply.header('content-type', 'application/pdf');
   reply.header('content-disposition', `attachment; filename="armadillo-scan-report-${scanId}-${reportAudience}.pdf"`);
