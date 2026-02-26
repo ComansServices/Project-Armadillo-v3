@@ -33,11 +33,11 @@ Goal: close remaining legacy-era feature gaps in a controlled, one-by-one sequen
 - [x] Acceptance: operator can copy practical host commands from asset/host page
 
 ### 5) Exploit enrichment parity
-- [ ] Add optional exploit-source enrichment adapter(s)
-- [ ] Store exploit references linked to CVE findings
-- [ ] Display exploit references in `/vulns` and report outputs
-- [ ] Add cache/retry/timeout controls to reduce noise
-- [ ] Acceptance: findings can show exploit context when available
+- [x] Add optional exploit-source enrichment adapter(s)
+- [x] Store exploit references linked to CVE findings
+- [x] Display exploit references in `/vulns` and report outputs
+- [x] Add cache/retry/timeout controls to reduce noise
+- [x] Acceptance: findings can show exploit context when available
 
 ### 6) Production auth hardening completion
 - [ ] Finalize auth provider implementation (OIDC/SAML path)

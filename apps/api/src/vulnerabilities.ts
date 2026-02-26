@@ -16,6 +16,13 @@ type FindingSeed = {
   description: string;
 };
 
+type ExploitRef = {
+  source: string;
+  id: string;
+  url: string;
+  confidence: 'high' | 'medium' | 'low';
+};
+
 function normalize(s: string) {
   return s.trim().toLowerCase();
 }
@@ -32,6 +39,79 @@ function deriveCpeHints(asset: AssetLite): string[] {
   if (asset.ports.includes(3389) || tags.has('rdp')) hints.add('cpe:2.3:o:microsoft:windows:*');
 
   return [...hints];
+}
+
+const exploitCatalog: Record<string, ExploitRef[]> = {
+  'CVE-2024-6387': [
+    {
+      source: 'nvd',
+      id: 'CVE-2024-6387',
+      url: 'https://nvd.nist.gov/vuln/detail/CVE-2024-6387',
+      confidence: 'high'
+    },
+    {
+      source: 'cisa-kev',
+      id: 'CVE-2024-6387',
+      url: 'https://www.cisa.gov/known-exploited-vulnerabilities-catalog',
+      confidence: 'medium'
+    }
+  ],
+  'CVE-2023-44487': [
+    {
+      source: 'nvd',
+      id: 'CVE-2023-44487',
+      url: 'https://nvd.nist.gov/vuln/detail/CVE-2023-44487',
+      confidence: 'high'
+    }
+  ],
+  'CVE-2019-0708': [
+    {
+      source: 'nvd',
+      id: 'CVE-2019-0708',
+      url: 'https://nvd.nist.gov/vuln/detail/CVE-2019-0708',
+      confidence: 'high'
+    },
+    {
+      source: 'exploit-db',
+      id: '47014',
+      url: 'https://www.exploit-db.com/exploits/47014',
+      confidence: 'medium'
+    }
+  ]
+};
+
+const exploitCache = new Map<string, ExploitRef[]>();
+
+async function lookupExploitRefs(cve: string): Promise<ExploitRef[]> {
+  const key = cve.toUpperCase();
+  if (exploitCache.has(key)) return exploitCache.get(key)!;
+
+  const enabled = (process.env.EXPLOIT_ENRICH_ENABLED ?? 'true').toLowerCase() !== 'false';
+  if (!enabled) return [];
+
+  const timeoutMs = Math.min(Math.max(Number(process.env.EXPLOIT_ENRICH_TIMEOUT_MS ?? 800), 100), 3000);
+  const retries = Math.min(Math.max(Number(process.env.EXPLOIT_ENRICH_RETRIES ?? 1), 0), 3);
+
+  const task = async () => exploitCatalog[key] ?? [];
+
+  let attempt = 0;
+  let last: ExploitRef[] = [];
+  while (attempt <= retries) {
+    attempt += 1;
+    try {
+      const refs = await Promise.race([
+        task(),
+        new Promise<ExploitRef[]>((resolve) => setTimeout(() => resolve([]), timeoutMs))
+      ]);
+      last = refs;
+      break;
+    } catch {
+      if (attempt > retries) break;
+    }
+  }
+
+  exploitCache.set(key, last);
+  return last;
 }
 
 function cpeToFindings(cpe: string): FindingSeed[] {
@@ -126,9 +206,10 @@ export async function enrichImportVulnerabilities(importId: string) {
 
   let created = 0;
   for (const row of rows) {
+    const exploitRefs = await lookupExploitRefs(row.cve);
     const r = await prisma.assetVulnerability.upsert({
       where: { assetId_cve: { assetId: row.assetId, cve: row.cve } },
-      create: { ...row },
+      create: { ...row, exploitRefs },
       update: {
         cpe: row.cpe,
         severity: row.severity,
@@ -136,6 +217,7 @@ export async function enrichImportVulnerabilities(importId: string) {
         title: row.title,
         description: row.description,
         importId: row.importId,
+        exploitRefs,
         detectedAt: new Date()
       }
     });
@@ -156,7 +238,7 @@ export async function listVulnerabilities(filters: {
   severity?: string;
   limit?: number;
 }) {
-  return prisma.assetVulnerability.findMany({
+  const rows = await prisma.assetVulnerability.findMany({
     where: {
       importId: filters.importId,
       assetId: filters.assetId,
@@ -175,4 +257,19 @@ export async function listVulnerabilities(filters: {
     orderBy: [{ detectedAt: 'desc' }],
     take: Math.min(Math.max(filters.limit ?? 100, 1), 500)
   });
+
+  const includeExploits = (process.env.EXPLOIT_ENRICH_ENABLED ?? 'true').toLowerCase() !== 'false';
+  if (!includeExploits) return rows.map((r) => ({ ...r, exploitRefs: [] as ExploitRef[] }));
+
+  const enriched = await Promise.all(
+    rows.map(async (r) => {
+      const existing = Array.isArray(r.exploitRefs as unknown[]) ? (r.exploitRefs as unknown[] as ExploitRef[]) : [];
+      return {
+        ...r,
+        exploitRefs: existing.length > 0 ? existing : await lookupExploitRefs(r.cve)
+      };
+    })
+  );
+
+  return enriched;
 }

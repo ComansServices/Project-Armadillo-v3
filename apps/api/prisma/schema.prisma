@@ -144,6 +144,7 @@ model AssetVulnerability {
   title       String?
   description String?
   source      String   @default("builtin-enricher")
+  exploitRefs Json?
   detectedAt  DateTime @default(now())
 
   asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)

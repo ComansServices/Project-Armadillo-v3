@@ -10,6 +10,7 @@ type Finding = {
   description: string | null;
   detectedAt: string;
   importId: string;
+  exploitRefs?: Array<{ source: string; id: string; url: string; confidence: 'high' | 'medium' | 'low' }>;
   asset: {
     id: string;
     identityKey: string;
@@ -128,7 +129,7 @@ export default async function VulnsPage({
             <table style={{ borderCollapse: 'collapse', minWidth: 1200, width: '100%' }}>
               <thead>
                 <tr>
-                  {['Detected', 'Severity', 'CVE', 'CVSS', 'CPE', 'Asset', 'Import', 'Title'].map((h) => (
+                  {['Detected', 'Severity', 'CVE', 'CVSS', 'CPE', 'Exploits', 'Asset', 'Import', 'Title'].map((h) => (
                     <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
                       {h}
                     </th>
@@ -138,7 +139,7 @@ export default async function VulnsPage({
               <tbody>
                 {grouped[g].length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ padding: '12px 10px', color: '#666' }}>No findings for current filters.</td>
+                    <td colSpan={9} style={{ padding: '12px 10px', color: '#666' }}>No findings for current filters.</td>
                   </tr>
                 ) : (
                   grouped[g].map((f) => (
@@ -166,6 +167,19 @@ export default async function VulnsPage({
                       <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{f.cve}</td>
                       <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{f.cvss ?? '-'}</td>
                       <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{f.cpe ?? '-'}</td>
+                      <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontSize: 12 }}>
+                        {f.exploitRefs && f.exploitRefs.length > 0 ? (
+                          <div style={{ display: 'grid', gap: 4 }}>
+                            {f.exploitRefs.slice(0, 2).map((r) => (
+                              <a key={`${f.id}-${r.source}-${r.id}`} href={r.url} target="_blank" rel="noreferrer">
+                                {r.source}:{r.id}
+                              </a>
+                            ))}
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
                       <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
                         <Link href={`/assets/${f.asset.id}`}>{f.asset.identityKey}</Link>
                       </td>

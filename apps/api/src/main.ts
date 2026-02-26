@@ -813,7 +813,8 @@ app.get('/api/v1/vulns', async (req, reply) => {
       'hostname',
       'importId',
       'title',
-      'description'
+      'description',
+      'exploitRefs'
     ];
     const lines = [header.join(',')];
     for (const r of rows) {
@@ -831,7 +832,12 @@ app.get('/api/v1/vulns', async (req, reply) => {
           r.asset.hostname ?? '',
           r.importId,
           r.title ?? '',
-          r.description ?? ''
+          r.description ?? '',
+          Array.isArray((r as { exploitRefs?: Array<{ source: string; id: string }> }).exploitRefs)
+            ? ((r as { exploitRefs?: Array<{ source: string; id: string }> }).exploitRefs ?? [])
+                .map((e) => `${e.source}:${e.id}`)
+                .join(' | ')
+            : ''
         ]
           .map(esc)
           .join(',')
@@ -1094,7 +1100,16 @@ app.get('/api/v1/reports/imports/:importId.pdf', async (req, reply) => {
 
   const topFindings = findings
     .slice(0, reportAudience === 'exec' ? 8 : 15)
-    .map((f) => `[${String(f.severity).toUpperCase()}] ${f.cve} ${f.asset.identityKey} ${f.title ?? ''}`.trim());
+    .map((f) => {
+      const refs = Array.isArray((f as { exploitRefs?: Array<{ source: string; id: string }> }).exploitRefs)
+        ? ((f as { exploitRefs?: Array<{ source: string; id: string }> }).exploitRefs ?? [])
+            .slice(0, 2)
+            .map((e) => `${e.source}:${e.id}`)
+            .join(', ')
+        : '';
+      const tail = refs ? ` | exploits: ${refs}` : '';
+      return `[${String(f.severity).toUpperCase()}] ${f.cve} ${f.asset.identityKey} ${f.title ?? ''}${tail}`.trim();
+    });
 
   const pdf = await buildBrandedReportPdf({
     title: 'Armadillo Import Report',
