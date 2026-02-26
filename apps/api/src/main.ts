@@ -6,6 +6,7 @@ import { createXmlImport, getImportQualityDigest, getXmlImport, listImportQualit
 import { backfillAssetIdentityKeys, getAsset, listAssets } from './assets';
 import { getSourcePolicy, listSourcePolicies, upsertSourcePolicy } from './policies';
 import { prisma } from './prisma';
+import { enrichImportVulnerabilities, listVulnerabilities } from './vulnerabilities';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
@@ -571,6 +572,42 @@ app.get('/api/v1/imports/:importId/diff', async (req, reply) => {
       changed: changed.slice(0, 20)
     }
   };
+});
+
+app.post('/api/v1/imports/:importId/vuln-enrich', async (req, reply) => {
+  const actor = requireRole(req, reply, 'staff');
+  if (!actor) return;
+  const { importId } = req.params as { importId: string };
+  const exists = await prisma.xmlImport.findUnique({ where: { id: importId }, select: { id: true } });
+  if (!exists) return reply.code(404).send({ error: 'Import not found' });
+  const result = await enrichImportVulnerabilities(importId);
+  return result;
+});
+
+app.get('/api/v1/vulns', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+  const { importId, assetId, severity, limit } = req.query as {
+    importId?: string;
+    assetId?: string;
+    severity?: string;
+    limit?: string;
+  };
+  const rows = await listVulnerabilities({
+    importId,
+    assetId,
+    severity,
+    limit: Number(limit ?? 100)
+  });
+  return { findings: rows };
+});
+
+app.get('/api/v1/assets/:assetId/vulns', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+  const { assetId } = req.params as { assetId: string };
+  const rows = await listVulnerabilities({ assetId, limit: 200 });
+  return { findings: rows };
 });
 
 app.listen({ host: '0.0.0.0', port: 4000 }).then(() => {

@@ -63,6 +63,7 @@ model XmlImport {
   payload               Json
   createdAt             DateTime  @default(now())
   assets                Asset[]
+  vulnerabilities       AssetVulnerability[]
 
   @@index([createdAt])
   @@map("xml_imports")
@@ -97,10 +98,33 @@ model Asset {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 
-  xmlImport  XmlImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  xmlImport       XmlImport            @relation(fields: [importId], references: [id], onDelete: Cascade)
+  vulnerabilities AssetVulnerability[]
 
   @@index([importId, createdAt])
   @@index([ip])
   @@index([hostname])
   @@map("assets")
+}
+
+model AssetVulnerability {
+  id          Int      @id @default(autoincrement())
+  assetId     String
+  importId    String
+  cve         String
+  cpe         String?
+  severity    String
+  cvss        Float?
+  title       String?
+  description String?
+  source      String   @default("builtin-enricher")
+  detectedAt  DateTime @default(now())
+
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  xmlImport XmlImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, cve])
+  @@index([importId, severity])
+  @@index([cve])
+  @@map("asset_vulnerabilities")
 }

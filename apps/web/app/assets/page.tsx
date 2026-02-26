@@ -74,6 +74,9 @@ export default async function AssetsPage({
       <p style={{ marginBottom: 12 }}>
         <Link href="/imports">← Back to imports</Link>
       </p>
+      <p style={{ marginTop: 0 }}>
+        <Link href="/vulns">View vulnerability findings →</Link>
+      </p>
       <h1 style={{ marginBottom: 8 }}>Normalized Assets</h1>
       <p style={{ marginTop: 0 }}>Assets extracted from XML imports (auto-refresh every 5s).</p>
 

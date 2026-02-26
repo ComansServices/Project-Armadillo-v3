@@ -47,6 +47,9 @@ export default async function HomePage() {
       <p style={{ marginTop: 0 }}>
         <Link href="/assets">View normalized assets →</Link>
       </p>
+      <p style={{ marginTop: 0 }}>
+        <Link href="/vulns">View vulnerability findings →</Link>
+      </p>
 
       <meta httpEquiv="refresh" content="5" />
 

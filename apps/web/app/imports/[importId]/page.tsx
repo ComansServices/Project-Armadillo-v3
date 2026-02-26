@@ -102,6 +102,24 @@ async function saveImportAnnotationsAction(formData: FormData) {
   redirect(`/imports/${importId}?saved=1`);
 }
 
+async function runVulnEnrichmentAction(formData: FormData) {
+  'use server';
+  const importId = String(formData.get('importId') ?? '').trim();
+  if (!importId) return;
+
+  const res = await fetch(`${baseUrl}/api/v1/imports/${importId}/vuln-enrich`, {
+    method: 'POST',
+    headers: {
+      ...editHeaders,
+      'content-type': 'application/json'
+    }
+  });
+
+  revalidatePath(`/imports/${importId}`);
+  if (!res.ok) redirect(`/imports/${importId}?enrichError=${res.status}`);
+  redirect(`/imports/${importId}?enriched=1`);
+}
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -115,7 +133,9 @@ export default async function ImportDetailPage({
   const qp = searchParams ? await searchParams : undefined;
   const againstImportId = typeof qp?.againstImportId === 'string' ? qp.againstImportId : '';
   const saved = qp?.saved === '1';
+  const enriched = qp?.enriched === '1';
   const saveError = typeof qp?.saveError === 'string' ? qp.saveError : null;
+  const enrichError = typeof qp?.enrichError === 'string' ? qp.enrichError : null;
   const canEdit = ['owner', 'admin', 'staff'].includes(
     (process.env.WEB_ADMIN_ACTOR_ROLE ?? process.env.WEB_ACTOR_ROLE ?? 'viewer').toLowerCase()
   );
@@ -145,9 +165,11 @@ export default async function ImportDetailPage({
 
       <h2 style={{ marginBottom: 8 }}>Annotations</h2>
       {saved ? <p style={{ color: '#0b7d29' }}>Annotations saved.</p> : null}
+      {enriched ? <p style={{ color: '#0b7d29' }}>Vulnerability enrichment completed.</p> : null}
       {saveError ? <p style={{ color: '#a61b1b' }}>Annotation save failed (HTTP {saveError}).</p> : null}
+      {enrichError ? <p style={{ color: '#a61b1b' }}>Vulnerability enrichment failed (HTTP {enrichError}).</p> : null}
       {!canEdit ? <p style={{ color: '#666' }}>Annotations are read-only for current web actor role.</p> : null}
-      <form action={canEdit ? saveImportAnnotationsAction : undefined} style={{ display: 'grid', gap: 8, marginBottom: 16, maxWidth: 900 }}>
+      <form action={canEdit ? saveImportAnnotationsAction : undefined} style={{ display: 'grid', gap: 8, marginBottom: 8, maxWidth: 900 }}>
         <input type="hidden" name="importId" value={data.id} />
         <label>
           Labels (comma separated)
@@ -160,6 +182,11 @@ export default async function ImportDetailPage({
         <div>
           <button type="submit" disabled={!canEdit}>Save annotations</button>
         </div>
+      </form>
+      <form action={canEdit ? runVulnEnrichmentAction : undefined} style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+        <input type="hidden" name="importId" value={data.id} />
+        <button type="submit" disabled={!canEdit}>Run CVE/CPE enrichment</button>
+        <Link href={`/vulns?importId=${data.id}`}>View findings for this import →</Link>
       </form>
 
       <h2 style={{ marginBottom: 8 }}>Import Diff</h2>
