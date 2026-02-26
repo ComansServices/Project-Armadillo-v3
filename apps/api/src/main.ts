@@ -5,6 +5,7 @@ import { createScan, getScan, listScans, listScanEvents } from './store';
 import { createXmlImport, getImportQualityDigest, getXmlImport, listImportQualityTrend, listXmlImports } from './imports';
 import { backfillAssetIdentityKeys, getAsset, listAssets } from './assets';
 import { getSourcePolicy, listSourcePolicies, upsertSourcePolicy } from './policies';
+import { prisma } from './prisma';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
@@ -37,6 +38,22 @@ function requireRole(req: FastifyRequest, reply: FastifyReply, minimumRole: User
     return null;
   }
   return actor;
+}
+
+type AnnotationPayload = { labels?: string[]; notes?: string };
+
+function sanitizeAnnotations(input: AnnotationPayload) {
+  const labels = Array.isArray(input.labels)
+    ? [...new Set(input.labels.map((v) => String(v).trim()).filter(Boolean))].slice(0, 20)
+    : [];
+  const notes = typeof input.notes === 'string' ? input.notes.trim().slice(0, 4000) : '';
+  return { labels, notes };
+}
+
+function mergeCounts(base: Record<string, number>, next: Record<string, number>) {
+  const out: Record<string, number> = { ...base };
+  for (const [k, v] of Object.entries(next)) out[k] = (out[k] ?? 0) + v;
+  return out;
 }
 
 app.get('/health', async () => ({ ok: true, service: 'armadillo-api' }));
@@ -406,6 +423,134 @@ app.post('/api/v1/assets/backfill-identity', async (req, reply) => {
   const result = await backfillAssetIdentityKeys();
   app.log.info({ actorId: actor.actorId, ...result }, 'asset identity backfill complete');
   return result;
+});
+
+app.get('/api/v1/imports/:importId/annotations', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+  const { importId } = req.params as { importId: string };
+  const row = await prisma.xmlImport.findUnique({ where: { id: importId }, select: { annotations: true } });
+  if (!row) return reply.code(404).send({ error: 'Import not found' });
+  return { importId, annotations: row.annotations ?? { labels: [], notes: '' } };
+});
+
+app.post('/api/v1/imports/:importId/annotations', async (req, reply) => {
+  const actor = requireRole(req, reply, 'staff');
+  if (!actor) return;
+  const { importId } = req.params as { importId: string };
+  const payload = sanitizeAnnotations((req.body ?? {}) as AnnotationPayload);
+  const updated = await prisma.xmlImport.update({ where: { id: importId }, data: { annotations: payload } }).catch(() => null);
+  if (!updated) return reply.code(404).send({ error: 'Import not found' });
+  return { importId, annotations: updated.annotations };
+});
+
+app.get('/api/v1/assets/:assetId/annotations', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+  const { assetId } = req.params as { assetId: string };
+  const row = await prisma.asset.findUnique({ where: { id: assetId }, select: { annotations: true } });
+  if (!row) return reply.code(404).send({ error: 'Asset not found' });
+  return { assetId, annotations: row.annotations ?? { labels: [], notes: '' } };
+});
+
+app.post('/api/v1/assets/:assetId/annotations', async (req, reply) => {
+  const actor = requireRole(req, reply, 'staff');
+  if (!actor) return;
+  const { assetId } = req.params as { assetId: string };
+  const payload = sanitizeAnnotations((req.body ?? {}) as AnnotationPayload);
+  const updated = await prisma.asset.update({ where: { id: assetId }, data: { annotations: payload } }).catch(() => null);
+  if (!updated) return reply.code(404).send({ error: 'Asset not found' });
+  return { assetId, annotations: updated.annotations };
+});
+
+app.get('/api/v1/scans/:scanId/diff', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+  const { scanId } = req.params as { scanId: string };
+  const { againstScanId } = req.query as { againstScanId?: string };
+  if (!againstScanId) return reply.code(400).send({ error: 'againstScanId is required' });
+
+  const [a, b] = await Promise.all([
+    prisma.scanEvent.findMany({ where: { scanId }, select: { stage: true, status: true } }),
+    prisma.scanEvent.findMany({ where: { scanId: againstScanId }, select: { stage: true, status: true } })
+  ]);
+
+  const toBucket = (rows: Array<{ stage: string | null; status: string | null }>) => {
+    let out: Record<string, number> = {};
+    for (const r of rows) {
+      const key = `${r.stage ?? '-'}:${r.status ?? '-'}`;
+      out = mergeCounts(out, { [key]: 1 });
+    }
+    return out;
+  };
+
+  const left = toBucket(a);
+  const right = toBucket(b);
+  const keys = [...new Set([...Object.keys(left), ...Object.keys(right)])];
+  const deltas = keys
+    .map((k) => ({ key: k, current: left[k] ?? 0, baseline: right[k] ?? 0, delta: (left[k] ?? 0) - (right[k] ?? 0) }))
+    .filter((r) => r.delta !== 0)
+    .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta));
+
+  return {
+    scanId,
+    againstScanId,
+    summary: { currentEvents: a.length, baselineEvents: b.length, changedBuckets: deltas.length },
+    deltas
+  };
+});
+
+app.get('/api/v1/imports/:importId/diff', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+  const { importId } = req.params as { importId: string };
+  const { againstImportId } = req.query as { againstImportId?: string };
+  if (!againstImportId) return reply.code(400).send({ error: 'againstImportId is required' });
+
+  const [current, baseline] = await Promise.all([
+    prisma.asset.findMany({ where: { importId }, select: { identityKey: true, ports: true, serviceTags: true } }),
+    prisma.asset.findMany({ where: { importId: againstImportId }, select: { identityKey: true, ports: true, serviceTags: true } })
+  ]);
+
+  const currMap = new Map(current.map((a) => [a.identityKey, a]));
+  const baseMap = new Map(baseline.map((a) => [a.identityKey, a]));
+
+  const added: string[] = [];
+  const removed: string[] = [];
+  const changed: string[] = [];
+
+  for (const key of currMap.keys()) {
+    if (!baseMap.has(key)) {
+      added.push(key);
+      continue;
+    }
+    const c = currMap.get(key)!;
+    const b = baseMap.get(key)!;
+    const portsChanged = JSON.stringify([...c.ports].sort((x, y) => x - y)) !== JSON.stringify([...b.ports].sort((x, y) => x - y));
+    const tagsChanged = JSON.stringify([...c.serviceTags].sort()) !== JSON.stringify([...b.serviceTags].sort());
+    if (portsChanged || tagsChanged) changed.push(key);
+  }
+
+  for (const key of baseMap.keys()) {
+    if (!currMap.has(key)) removed.push(key);
+  }
+
+  return {
+    importId,
+    againstImportId,
+    summary: {
+      currentAssets: current.length,
+      baselineAssets: baseline.length,
+      added: added.length,
+      removed: removed.length,
+      changed: changed.length
+    },
+    samples: {
+      added: added.slice(0, 20),
+      removed: removed.slice(0, 20),
+      changed: changed.slice(0, 20)
+    }
+  };
 });
 
 app.listen({ host: '0.0.0.0', port: 4000 }).then(() => {

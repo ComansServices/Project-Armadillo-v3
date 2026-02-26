@@ -19,8 +19,7 @@ type ScanEvent = {
   createdAt: string;
 };
 
-const baseUrl =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+const baseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
 const authHeaders = {
   'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
@@ -43,11 +42,33 @@ async function getEvents(scanId: string): Promise<ScanEvent[]> {
   return data.events ?? [];
 }
 
+async function getScanDiff(scanId: string, againstScanId: string) {
+  const res = await fetch(`${baseUrl}/api/v1/scans/${scanId}/diff?againstScanId=${againstScanId}`, {
+    cache: 'no-store',
+    headers: authHeaders
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function ScanDetailPage({ params }: { params: { scanId: string } }) {
-  const [scan, events] = await Promise.all([getScan(params.scanId), getEvents(params.scanId)]);
+export default async function ScanDetailPage({
+  params,
+  searchParams
+}: {
+  params: { scanId: string };
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const qp = searchParams ? await searchParams : undefined;
+  const againstScanId = typeof qp?.againstScanId === 'string' ? qp.againstScanId : '';
+
+  const [scan, events, diff] = await Promise.all([
+    getScan(params.scanId),
+    getEvents(params.scanId),
+    againstScanId ? getScanDiff(params.scanId, againstScanId) : Promise.resolve(null)
+  ]);
 
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
@@ -65,6 +86,28 @@ export default async function ScanDetailPage({ params }: { params: { scanId: str
         <strong>Project:</strong> {scan.projectId} &nbsp; | &nbsp;
         <strong>Requested By:</strong> {scan.requestedBy}
       </div>
+
+      <h2 style={{ marginBottom: 8 }}>Scan Diff</h2>
+      <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <input name="againstScanId" placeholder="Compare against scan ID" defaultValue={againstScanId} style={{ minWidth: 420 }} />
+        <button type="submit">Compare</button>
+      </form>
+      {diff ? (
+        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12, marginBottom: 16, background: '#fafafa' }}>
+          <p style={{ marginTop: 0 }}>
+            <strong>Current/Baseline Events:</strong> {diff.summary.currentEvents}/{diff.summary.baselineEvents} &nbsp; | &nbsp;
+            <strong>Changed Buckets:</strong> {diff.summary.changedBuckets}
+          </p>
+          <ul style={{ marginBottom: 0 }}>
+            {(diff.deltas ?? []).slice(0, 10).map((d: { key: string; delta: number }) => (
+              <li key={d.key}>
+                {d.key}: {d.delta > 0 ? '+' : ''}
+                {d.delta}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <h2 style={{ marginBottom: 8 }}>Timeline</h2>
       <meta httpEquiv="refresh" content="5" />

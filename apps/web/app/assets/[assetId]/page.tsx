@@ -1,4 +1,6 @@
+import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 type AssetDetail = {
   id: string;
@@ -9,16 +11,21 @@ type AssetDetail = {
   seenCount: number;
   firstSeenAt: string;
   lastSeenAt: string;
+  annotations?: { labels?: string[]; notes?: string } | null;
   raw: unknown;
   createdAt: string;
 };
 
-const baseUrl =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+const baseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
 const authHeaders = {
   'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
   'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
+};
+
+const editHeaders = {
+  'x-armadillo-user': process.env.WEB_ADMIN_ACTOR_ID ?? process.env.WEB_ACTOR_ID ?? 'web-admin',
+  'x-armadillo-role': process.env.WEB_ADMIN_ACTOR_ROLE ?? process.env.WEB_ACTOR_ROLE ?? 'viewer'
 };
 
 async function getAsset(assetId: string): Promise<AssetDetail> {
@@ -34,11 +41,45 @@ async function getAsset(assetId: string): Promise<AssetDetail> {
   return res.json();
 }
 
+async function saveAssetAnnotationsAction(formData: FormData) {
+  'use server';
+  const assetId = String(formData.get('assetId') ?? '').trim();
+  if (!assetId) return;
+
+  const labels = String(formData.get('labels') ?? '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const notes = String(formData.get('notes') ?? '').trim();
+
+  await fetch(`${baseUrl}/api/v1/assets/${assetId}/annotations`, {
+    method: 'POST',
+    headers: {
+      ...editHeaders,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({ labels, notes })
+  });
+
+  revalidatePath(`/assets/${assetId}`);
+  redirect(`/assets/${assetId}?saved=1`);
+}
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function AssetDetailPage({ params }: { params: { assetId: string } }) {
+export default async function AssetDetailPage({
+  params,
+  searchParams
+}: {
+  params: { assetId: string };
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const qp = searchParams ? await searchParams : undefined;
+  const saved = qp?.saved === '1';
   const data = await getAsset(params.assetId);
+  const labels = (data.annotations?.labels ?? []).join(', ');
+  const notes = data.annotations?.notes ?? '';
 
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
@@ -58,6 +99,23 @@ export default async function AssetDetailPage({ params }: { params: { assetId: s
         <strong>Seen:</strong> {data.seenCount} &nbsp; | &nbsp;
         <strong>Last Seen:</strong> {new Date(data.lastSeenAt).toLocaleString()}
       </div>
+
+      <h2 style={{ marginBottom: 8 }}>Annotations</h2>
+      {saved ? <p style={{ color: '#0b7d29' }}>Annotations saved.</p> : null}
+      <form action={saveAssetAnnotationsAction} style={{ display: 'grid', gap: 8, marginBottom: 16, maxWidth: 900 }}>
+        <input type="hidden" name="assetId" value={data.id} />
+        <label>
+          Labels (comma separated)
+          <input name="labels" defaultValue={labels} style={{ width: '100%' }} />
+        </label>
+        <label>
+          Notes
+          <textarea name="notes" defaultValue={notes} rows={4} style={{ width: '100%' }} />
+        </label>
+        <div>
+          <button type="submit">Save annotations</button>
+        </div>
+      </form>
 
       <h2 style={{ marginBottom: 8 }}>Raw Asset Node</h2>
       <pre

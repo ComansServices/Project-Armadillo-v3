@@ -20,6 +20,7 @@ model Scan {
   requestedBy String
   status      ScanStatus  @default(queued)
   request     Json?
+  annotations Json?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   events      ScanEvent[]
@@ -58,6 +59,7 @@ model XmlImport {
   invalidAssetCount     Int       @default(0)
   qualitySummary        Json?
   rejectArtifact        Json?
+  annotations           Json?
   payload               Json
   createdAt             DateTime  @default(now())
   assets                Asset[]
@@ -88,6 +90,7 @@ model Asset {
   serviceTags   String[] @default([])
   sourceType    String   @default("xml")
   raw           Json
+  annotations   Json?
   seenCount     Int      @default(1)
   firstSeenAt   DateTime @default(now())
   lastSeenAt    DateTime @default(now())

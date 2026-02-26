@@ -1,4 +1,6 @@
+import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 type XmlImportDetail = {
   id: string;
@@ -12,6 +14,7 @@ type XmlImportDetail = {
   normalizedAssetCount: number;
   skippedAssetCount: number;
   invalidAssetCount: number;
+  annotations?: { labels?: string[]; notes?: string } | null;
   qualitySummary: {
     parsedObjects: number;
     normalizedAssetCount: number;
@@ -27,12 +30,16 @@ type XmlImportDetail = {
   createdAt: string;
 };
 
-const baseUrl =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+const baseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
 const authHeaders = {
   'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
   'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
+};
+
+const editHeaders = {
+  'x-armadillo-user': process.env.WEB_ADMIN_ACTOR_ID ?? process.env.WEB_ACTOR_ID ?? 'web-admin',
+  'x-armadillo-role': process.env.WEB_ADMIN_ACTOR_ROLE ?? process.env.WEB_ACTOR_ROLE ?? 'viewer'
 };
 
 async function getImport(importId: string): Promise<XmlImportDetail> {
@@ -48,11 +55,57 @@ async function getImport(importId: string): Promise<XmlImportDetail> {
   return res.json();
 }
 
+async function getImportDiff(importId: string, againstImportId: string) {
+  const res = await fetch(`${baseUrl}/api/v1/imports/${importId}/diff?againstImportId=${againstImportId}`, {
+    cache: 'no-store',
+    headers: authHeaders
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+async function saveImportAnnotationsAction(formData: FormData) {
+  'use server';
+  const importId = String(formData.get('importId') ?? '').trim();
+  if (!importId) return;
+
+  const labels = String(formData.get('labels') ?? '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const notes = String(formData.get('notes') ?? '').trim();
+
+  await fetch(`${baseUrl}/api/v1/imports/${importId}/annotations`, {
+    method: 'POST',
+    headers: {
+      ...editHeaders,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({ labels, notes })
+  });
+
+  revalidatePath(`/imports/${importId}`);
+  redirect(`/imports/${importId}?saved=1`);
+}
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function ImportDetailPage({ params }: { params: { importId: string } }) {
+export default async function ImportDetailPage({
+  params,
+  searchParams
+}: {
+  params: { importId: string };
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const qp = searchParams ? await searchParams : undefined;
+  const againstImportId = typeof qp?.againstImportId === 'string' ? qp.againstImportId : '';
+  const saved = qp?.saved === '1';
+
   const data = await getImport(params.importId);
+  const diff = againstImportId ? await getImportDiff(params.importId, againstImportId) : null;
+  const labels = (data.annotations?.labels ?? []).join(', ');
+  const notes = data.annotations?.notes ?? '';
 
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
@@ -68,6 +121,42 @@ export default async function ImportDetailPage({ params }: { params: { importId:
         <strong>Root Node:</strong> {data.rootNode ?? '-'} &nbsp; | &nbsp;
         <strong>Items:</strong> {data.itemCount}
       </div>
+
+      <h2 style={{ marginBottom: 8 }}>Annotations</h2>
+      {saved ? <p style={{ color: '#0b7d29' }}>Annotations saved.</p> : null}
+      <form action={saveImportAnnotationsAction} style={{ display: 'grid', gap: 8, marginBottom: 16, maxWidth: 900 }}>
+        <input type="hidden" name="importId" value={data.id} />
+        <label>
+          Labels (comma separated)
+          <input name="labels" defaultValue={labels} style={{ width: '100%' }} />
+        </label>
+        <label>
+          Notes
+          <textarea name="notes" defaultValue={notes} rows={4} style={{ width: '100%' }} />
+        </label>
+        <div>
+          <button type="submit">Save annotations</button>
+        </div>
+      </form>
+
+      <h2 style={{ marginBottom: 8 }}>Import Diff</h2>
+      <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <input name="againstImportId" placeholder="Compare against import ID" defaultValue={againstImportId} style={{ minWidth: 420 }} />
+        <button type="submit">Compare</button>
+      </form>
+      {diff ? (
+        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12, marginBottom: 16, background: '#fafafa' }}>
+          <p style={{ marginTop: 0 }}>
+            <strong>Current/Baseline:</strong> {diff.summary.currentAssets}/{diff.summary.baselineAssets} &nbsp; | &nbsp;
+            <strong>Added:</strong> {diff.summary.added} &nbsp; | &nbsp;
+            <strong>Removed:</strong> {diff.summary.removed} &nbsp; | &nbsp;
+            <strong>Changed:</strong> {diff.summary.changed}
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            <strong>Sample added:</strong> {(diff.samples.added ?? []).slice(0, 5).join(', ') || '-'}
+          </p>
+        </div>
+      ) : null}
 
       <h2 style={{ marginBottom: 8 }}>Import Quality Summary</h2>
       <div
