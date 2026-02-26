@@ -107,6 +107,16 @@ export default async function ScanDetailPage({
         <strong>Requested By:</strong> {scan.requestedBy}
       </div>
 
+      <p style={{ marginTop: 0 }}>
+        <a
+          href={`${publicApiBaseUrl}/api/v1/reports/scans/${scan.id}.pdf${effectiveAgainstScanId ? `?againstScanId=${effectiveAgainstScanId}` : ''}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Download scan PDF report →
+        </a>
+      </p>
+
       <h2 style={{ marginBottom: 8 }}>Scan Diff</h2>
       <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <select name="againstScanId" defaultValue={effectiveAgainstScanId} style={{ minWidth: 520 }}>

@@ -708,6 +708,70 @@ app.get('/api/v1/reports/imports/:importId.pdf', async (req, reply) => {
   return reply.send(pdf);
 });
 
+app.get('/api/v1/reports/scans/:scanId.pdf', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+  const { scanId } = req.params as { scanId: string };
+  const { againstScanId } = req.query as { againstScanId?: string };
+
+  const scan = await prisma.scan.findUnique({ where: { id: scanId } });
+  if (!scan) return reply.code(404).send({ error: 'Scan not found' });
+
+  const events = await prisma.scanEvent.findMany({ where: { scanId }, orderBy: { createdAt: 'asc' }, take: 50 });
+
+  let diffSummary = '';
+  if (againstScanId) {
+    const [a, b] = await Promise.all([
+      prisma.scanEvent.findMany({ where: { scanId }, select: { stage: true, status: true } }),
+      prisma.scanEvent.findMany({ where: { scanId: againstScanId }, select: { stage: true, status: true } })
+    ]);
+
+    const toBucket = (rows: Array<{ stage: string | null; status: string | null }>) => {
+      let out: Record<string, number> = {};
+      for (const r of rows) {
+        const key = `${r.stage ?? '-'}:${r.status ?? '-'}`;
+        out = mergeCounts(out, { [key]: 1 });
+      }
+      return out;
+    };
+
+    const left = toBucket(a);
+    const right = toBucket(b);
+    const keys = [...new Set([...Object.keys(left), ...Object.keys(right)])];
+    const changedBuckets = keys.filter((k) => (left[k] ?? 0) !== (right[k] ?? 0)).length;
+    diffSummary = `Diff vs ${againstScanId}: currentEvents=${a.length}, baselineEvents=${b.length}, changedBuckets=${changedBuckets}`;
+  }
+
+  const vulnRows = await prisma.assetVulnerability.findMany({ take: 200 });
+
+  const sev = vulnRows.reduce<Record<string, number>>((acc, r) => {
+    const k = String(r.severity || 'unknown').toLowerCase();
+    acc[k] = (acc[k] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const lines = [
+    `Generated: ${new Date().toISOString()}`,
+    `Scan: ${scan.id}`,
+    `Project: ${scan.projectId}`,
+    `RequestedBy: ${scan.requestedBy}`,
+    `Status: ${scan.status}`,
+    `Created: ${scan.createdAt.toISOString()}`,
+    `Updated: ${scan.updatedAt.toISOString()}`,
+    diffSummary,
+    '',
+    `Timeline events captured: ${events.length}`,
+    ...events.slice(0, 20).map((e) => `- ${e.createdAt.toISOString()} | ${e.stage ?? '-'} | ${e.status ?? '-'} | ${e.message ?? '-'}`),
+    '',
+    `Global vulnerability snapshot: critical=${sev.critical ?? 0}, high=${sev.high ?? 0}, medium=${sev.medium ?? 0}, low=${sev.low ?? 0}`
+  ];
+
+  const pdf = buildSimpleTextPdf('Armadillo Scan Report', lines);
+  reply.header('content-type', 'application/pdf');
+  reply.header('content-disposition', `attachment; filename="armadillo-scan-report-${scanId}.pdf"`);
+  return reply.send(pdf);
+});
+
 app.listen({ host: '0.0.0.0', port: 4000 }).then(() => {
   console.log('API listening on http://localhost:4000');
 });
