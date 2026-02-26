@@ -7,7 +7,7 @@ import { backfillAssetIdentityKeys, getAsset, listAssets } from './assets';
 import { getSourcePolicy, listSourcePolicies, upsertSourcePolicy } from './policies';
 import { prisma } from './prisma';
 import { enrichImportVulnerabilities, listVulnerabilities } from './vulnerabilities';
-import { buildSimpleTextPdf } from './report-pdf';
+import { buildBrandedReportPdf } from './report-pdf';
 import type { ScanRequest, ScanJobPayload } from '@armadillo/types/src/pipeline';
 
 const app = Fastify({ logger: true });
@@ -661,19 +661,20 @@ app.get('/api/v1/reports/imports/:importId.pdf', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
   const { importId } = req.params as { importId: string };
-  const { againstImportId } = req.query as { againstImportId?: string };
+  const { againstImportId, audience } = req.query as { againstImportId?: string; audience?: string };
+  const reportAudience: 'ops' | 'exec' = audience === 'exec' ? 'exec' : 'ops';
 
   const importRow = await prisma.xmlImport.findUnique({ where: { id: importId } });
   if (!importRow) return reply.code(404).send({ error: 'Import not found' });
 
-  const findings = await listVulnerabilities({ importId, limit: 50 });
+  const findings = await listVulnerabilities({ importId, limit: reportAudience === 'exec' ? 20 : 50 });
   const sev = findings.reduce<Record<string, number>>((acc, f) => {
     const key = String(f.severity || 'unknown').toLowerCase();
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
 
-  let diffSummary = '';
+  let diffSummary = 'No baseline selected';
   if (againstImportId) {
     const [current, baseline] = await Promise.all([
       prisma.asset.findMany({ where: { importId }, select: { identityKey: true, ports: true, serviceTags: true } }),
@@ -699,28 +700,45 @@ app.get('/api/v1/reports/imports/:importId.pdf', async (req, reply) => {
     diffSummary = `Diff vs ${againstImportId}: added=${added}, removed=${removed}, changed=${changed}`;
   }
 
-  const lines = [
-    `Generated: ${new Date().toISOString()}`,
-    `Import: ${importRow.id}`,
-    `Source: ${importRow.source ?? '-'}`,
-    `RequestedBy: ${importRow.requestedBy}`,
-    `Quality: mode=${importRow.qualityMode} status=${importRow.qualityStatus}`,
-    `Counts: items=${importRow.itemCount} normalized=${importRow.normalizedAssetCount} skipped=${importRow.skippedAssetCount} invalid=${importRow.invalidAssetCount}`,
-    diffSummary,
-    '',
-    `Vulnerability findings: ${findings.length}`,
-    `Severity split: critical=${sev.critical ?? 0}, high=${sev.high ?? 0}, medium=${sev.medium ?? 0}, low=${sev.low ?? 0}`,
-    '',
-    'Top findings:'
-  ];
+  const topFindings = findings
+    .slice(0, reportAudience === 'exec' ? 8 : 15)
+    .map((f) => `[${String(f.severity).toUpperCase()}] ${f.cve} ${f.asset.identityKey} ${f.title ?? ''}`.trim());
 
-  for (const f of findings.slice(0, 12)) {
-    lines.push(`- [${String(f.severity).toUpperCase()}] ${f.cve} ${f.asset.identityKey} ${f.title ?? ''}`.trim());
-  }
+  const pdf = buildBrandedReportPdf({
+    title: 'Armadillo Import Report',
+    subtitle: `Import ${importRow.id}`,
+    audience: reportAudience,
+    sections: [
+      {
+        heading: 'Import Overview',
+        lines: [
+          `Source: ${importRow.source ?? '-'}`,
+          `RequestedBy: ${importRow.requestedBy}`,
+          `Quality Mode: ${importRow.qualityMode}`,
+          `Quality Status: ${importRow.qualityStatus}`,
+          `Asset Counts: items=${importRow.itemCount}, normalized=${importRow.normalizedAssetCount}, skipped=${importRow.skippedAssetCount}, invalid=${importRow.invalidAssetCount}`
+        ]
+      },
+      {
+        heading: 'Change Summary',
+        lines: [diffSummary]
+      },
+      {
+        heading: 'Vulnerability Summary',
+        lines: [
+          `Findings considered: ${findings.length}`,
+          `Severity split: critical=${sev.critical ?? 0}, high=${sev.high ?? 0}, medium=${sev.medium ?? 0}, low=${sev.low ?? 0}`
+        ]
+      },
+      {
+        heading: reportAudience === 'exec' ? 'Key Findings' : 'Top Findings',
+        lines: topFindings.length ? topFindings : ['No findings for selected import.']
+      }
+    ]
+  });
 
-  const pdf = buildSimpleTextPdf('Armadillo Import Report', lines);
   reply.header('content-type', 'application/pdf');
-  reply.header('content-disposition', `attachment; filename="armadillo-import-report-${importId}.pdf"`);
+  reply.header('content-disposition', `attachment; filename="armadillo-import-report-${importId}-${reportAudience}.pdf"`);
   return reply.send(pdf);
 });
 
@@ -728,14 +746,15 @@ app.get('/api/v1/reports/scans/:scanId.pdf', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
   const { scanId } = req.params as { scanId: string };
-  const { againstScanId } = req.query as { againstScanId?: string };
+  const { againstScanId, audience } = req.query as { againstScanId?: string; audience?: string };
+  const reportAudience: 'ops' | 'exec' = audience === 'exec' ? 'exec' : 'ops';
 
   const scan = await prisma.scan.findUnique({ where: { id: scanId } });
   if (!scan) return reply.code(404).send({ error: 'Scan not found' });
 
-  const events = await prisma.scanEvent.findMany({ where: { scanId }, orderBy: { createdAt: 'asc' }, take: 50 });
+  const events = await prisma.scanEvent.findMany({ where: { scanId }, orderBy: { createdAt: 'asc' }, take: 80 });
 
-  let diffSummary = '';
+  let diffSummary = 'No baseline selected';
   if (againstScanId) {
     const [a, b] = await Promise.all([
       prisma.scanEvent.findMany({ where: { scanId }, select: { stage: true, status: true } }),
@@ -766,25 +785,44 @@ app.get('/api/v1/reports/scans/:scanId.pdf', async (req, reply) => {
     return acc;
   }, {});
 
-  const lines = [
-    `Generated: ${new Date().toISOString()}`,
-    `Scan: ${scan.id}`,
-    `Project: ${scan.projectId}`,
-    `RequestedBy: ${scan.requestedBy}`,
-    `Status: ${scan.status}`,
-    `Created: ${scan.createdAt.toISOString()}`,
-    `Updated: ${scan.updatedAt.toISOString()}`,
-    diffSummary,
-    '',
-    `Timeline events captured: ${events.length}`,
-    ...events.slice(0, 20).map((e) => `- ${e.createdAt.toISOString()} | ${e.stage ?? '-'} | ${e.status ?? '-'} | ${e.message ?? '-'}`),
-    '',
-    `Global vulnerability snapshot: critical=${sev.critical ?? 0}, high=${sev.high ?? 0}, medium=${sev.medium ?? 0}, low=${sev.low ?? 0}`
-  ];
+  const timelineLines = events
+    .slice(0, reportAudience === 'exec' ? 8 : 20)
+    .map((e) => `${e.createdAt.toISOString()} | ${e.stage ?? '-'} | ${e.status ?? '-'} | ${e.message ?? '-'}`);
 
-  const pdf = buildSimpleTextPdf('Armadillo Scan Report', lines);
+  const pdf = buildBrandedReportPdf({
+    title: 'Armadillo Scan Report',
+    subtitle: `Scan ${scan.id}`,
+    audience: reportAudience,
+    sections: [
+      {
+        heading: 'Scan Overview',
+        lines: [
+          `Project: ${scan.projectId}`,
+          `RequestedBy: ${scan.requestedBy}`,
+          `Status: ${scan.status}`,
+          `Created: ${scan.createdAt.toISOString()}`,
+          `Updated: ${scan.updatedAt.toISOString()}`
+        ]
+      },
+      {
+        heading: 'Change Summary',
+        lines: [diffSummary]
+      },
+      {
+        heading: 'Execution Timeline Snapshot',
+        lines: timelineLines.length ? timelineLines : ['No timeline events captured.']
+      },
+      {
+        heading: 'Vulnerability Context',
+        lines: [
+          `Global vulnerability snapshot: critical=${sev.critical ?? 0}, high=${sev.high ?? 0}, medium=${sev.medium ?? 0}, low=${sev.low ?? 0}`
+        ]
+      }
+    ]
+  });
+
   reply.header('content-type', 'application/pdf');
-  reply.header('content-disposition', `attachment; filename="armadillo-scan-report-${scanId}.pdf"`);
+  reply.header('content-disposition', `attachment; filename="armadillo-scan-report-${scanId}-${reportAudience}.pdf"`);
   return reply.send(pdf);
 });
 

@@ -189,13 +189,20 @@ export default async function ImportDetailPage({
         <Link href={`/vulns?importId=${data.id}`}>View findings for this import →</Link>
       </form>
 
-      <p style={{ marginTop: 0 }}>
+      <p style={{ marginTop: 0, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <a
-          href={`${publicApiBaseUrl}/api/v1/reports/imports/${data.id}.pdf${effectiveAgainstImportId ? `?againstImportId=${effectiveAgainstImportId}` : ''}`}
+          href={`${publicApiBaseUrl}/api/v1/reports/imports/${data.id}.pdf${effectiveAgainstImportId ? `?againstImportId=${effectiveAgainstImportId}&audience=ops` : '?audience=ops'}`}
           target="_blank"
           rel="noreferrer"
         >
-          Download PDF report →
+          Download Ops PDF report →
+        </a>
+        <a
+          href={`${publicApiBaseUrl}/api/v1/reports/imports/${data.id}.pdf${effectiveAgainstImportId ? `?againstImportId=${effectiveAgainstImportId}&audience=exec` : '?audience=exec'}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Download Exec PDF report →
         </a>
       </p>
 
