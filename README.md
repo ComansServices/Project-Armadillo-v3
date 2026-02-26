@@ -46,11 +46,15 @@ Implemented through **Step 23 kickoff**:
   - UI wired to report links from import and scan detail pages
 
 ### Current stop point
-- Next planned dev pickup: **Step 23 polish**
-  - branded PDF layout (tables/sections)
-  - optional chart snapshot embeds
-  - report templates per audience (ops vs exec)
-- Then continue roadmap to next feature tranche.
+- Phase 4 hardening has started:
+  - performance index migration prepared (`20260226_step24_phase4_perf_indexes`)
+  - report automation + archive + digest + failure alerting in place
+  - integration smoke script added: `scripts/integration_smoke_phase4.py`
+  - beta checklist added: `docs/phase4-beta-readiness-checklist.md`
+- Next planned dev pickup:
+  - apply/verify perf indexes in all envs
+  - expand integration tests from smoke to CI-grade suite
+  - complete threat model + pen-test prep + rollback pack.
 
 ## Pipeline (v1 practical combo)
 `naabu -> nmap -> httpx -> nuclei`
