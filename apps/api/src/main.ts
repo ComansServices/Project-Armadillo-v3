@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
@@ -23,13 +23,96 @@ const ROLE_ORDER: Record<UserRole, number> = {
   owner: 4
 };
 
+type AuthActor = {
+  actorId: string;
+  role: UserRole;
+  orgId: string;
+  projects: string[];
+  sessionId?: string;
+  authType: 'session' | 'legacy';
+};
+
+type SessionClaims = {
+  sub: string;
+  role: UserRole;
+  orgId?: string;
+  projects?: string[];
+  exp: number;
+  iat?: number;
+  sid?: string;
+};
+
+const authSecret = process.env.AUTH_SESSION_SECRET ?? '';
+const allowLegacyHeaders = (process.env.AUTH_ALLOW_LEGACY_HEADERS ?? 'true').toLowerCase() === 'true';
+const authFailThreshold = Math.min(Math.max(Number(process.env.AUTH_FAIL_THRESHOLD ?? 5), 1), 20);
+const authLockMinutes = Math.min(Math.max(Number(process.env.AUTH_LOCK_MINUTES ?? 15), 1), 180);
+const authFailures = new Map<string, { count: number; lockedUntil?: number }>();
+
+function auditAuth(event: string, meta: Record<string, unknown>) {
+  app.log.warn({ event, ...meta }, 'auth_audit');
+}
+
+function failAuth(key: string) {
+  const now = Date.now();
+  const curr = authFailures.get(key) ?? { count: 0 };
+  curr.count += 1;
+  if (curr.count >= authFailThreshold) {
+    curr.lockedUntil = now + authLockMinutes * 60 * 1000;
+  }
+  authFailures.set(key, curr);
+  return curr;
+}
+
+function clearAuthFail(key: string) {
+  authFailures.delete(key);
+}
+
+function isLocked(key: string) {
+  const row = authFailures.get(key);
+  if (!row?.lockedUntil) return false;
+  if (Date.now() > row.lockedUntil) {
+    authFailures.delete(key);
+    return false;
+  }
+  return true;
+}
+
+function parseSessionToken(token: string): SessionClaims | null {
+  try {
+    const [ver, payloadB64, sigHex] = token.trim().split('.');
+    if (ver !== 'v1' || !payloadB64 || !sigHex || !authSecret) return null;
+
+    const mac = createHmac('sha256', authSecret).update(`${ver}.${payloadB64}`).digest('hex');
+    const a = Buffer.from(sigHex, 'hex');
+    const b = Buffer.from(mac, 'hex');
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+
+    const claims = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8')) as SessionClaims;
+    if (!claims?.sub || !claims?.role || !claims?.exp) return null;
+    if (!['owner', 'admin', 'staff', 'viewer'].includes(claims.role)) return null;
+    if (Date.now() > claims.exp * 1000) return null;
+    return claims;
+  } catch {
+    return null;
+  }
+}
+
 function getActor(req: FastifyRequest) {
+  const cached = (req as FastifyRequest & { authActor?: AuthActor }).authActor;
+  if (cached) return cached;
+
   const actorId = String(req.headers['x-armadillo-user'] ?? 'anonymous');
   const rawRole = String(req.headers['x-armadillo-role'] ?? 'viewer').toLowerCase();
   const role: UserRole = ['owner', 'admin', 'staff', 'viewer'].includes(rawRole)
     ? (rawRole as UserRole)
     : 'viewer';
-  return { actorId, role };
+  return { actorId, role, orgId: 'legacy', projects: ['*'], authType: 'legacy' as const };
+}
+
+function ensureProjectScope(actor: AuthActor, projectId: string) {
+  if (!projectId) return true;
+  if (actor.projects.includes('*')) return true;
+  return actor.projects.includes(projectId);
 }
 
 function requireRole(req: FastifyRequest, reply: FastifyReply, minimumRole: UserRole) {
@@ -45,6 +128,50 @@ function requireRole(req: FastifyRequest, reply: FastifyReply, minimumRole: User
   return actor;
 }
 
+app.addHook('preHandler', async (req, reply) => {
+  if (!req.url.startsWith('/api/v1/')) return;
+
+  const ip = String(req.headers['x-forwarded-for'] ?? req.ip ?? 'unknown').split(',')[0].trim();
+  const authHeader = String(req.headers['x-armadillo-auth'] ?? req.headers.authorization ?? '').trim();
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+  const lockKey = `${ip}:${token.slice(0, 24) || String(req.headers['x-armadillo-user'] ?? 'anon')}`;
+
+  if (isLocked(lockKey)) {
+    auditAuth('auth_locked', { ip, path: req.url });
+    return reply.code(423).send({ error: 'auth_locked', message: 'Too many authentication failures' });
+  }
+
+  if (token) {
+    const claims = parseSessionToken(token);
+    if (!claims) {
+      const fail = failAuth(lockKey);
+      auditAuth('auth_failure', { ip, path: req.url, reason: 'invalid_or_expired_session', count: fail.count });
+      return reply.code(401).send({ error: 'invalid_session' });
+    }
+
+    const actor: AuthActor = {
+      actorId: claims.sub,
+      role: claims.role,
+      orgId: claims.orgId ?? 'default',
+      projects: Array.isArray(claims.projects) && claims.projects.length ? claims.projects : ['*'],
+      sessionId: claims.sid,
+      authType: 'session'
+    };
+    (req as FastifyRequest & { authActor?: AuthActor }).authActor = actor;
+    clearAuthFail(lockKey);
+    return;
+  }
+
+  if (!allowLegacyHeaders) {
+    const fail = failAuth(lockKey);
+    auditAuth('auth_failure', { ip, path: req.url, reason: 'missing_session', count: fail.count });
+    return reply.code(401).send({ error: 'missing_session' });
+  }
+
+  const actor = getActor(req);
+  (req as FastifyRequest & { authActor?: AuthActor }).authActor = actor;
+  auditAuth('auth_legacy_used', { ip, path: req.url, actorId: actor.actorId, role: actor.role });
+});
 type AnnotationPayload = { labels?: string[]; notes?: string };
 
 function sanitizeAnnotations(input: AnnotationPayload) {
@@ -174,6 +301,10 @@ app.post('/api/v1/scans', async (req, reply) => {
     return reply.code(400).send({ error: 'Invalid scan request payload' });
   }
 
+  if (!ensureProjectScope(actor, body.projectId)) {
+    return reply.code(403).send({ error: 'project_scope_denied', projectId: body.projectId });
+  }
+
   const scanId = randomUUID();
   await createScan({
     id: scanId,
@@ -207,10 +338,11 @@ app.get('/api/v1/scans', async (req, reply) => {
   const { limit } = req.query as { limit?: string };
   const parsedLimit = Math.min(Math.max(Number(limit ?? 25), 1), 100);
   const scans = await listScans(Number.isNaN(parsedLimit) ? 25 : parsedLimit);
+  const scoped = actor.projects.includes('*') ? scans : scans.filter((s) => ensureProjectScope(actor, s.projectId));
 
-  app.log.info({ actorId: actor.actorId, role: actor.role, count: scans.length }, 'scan list viewed');
+  app.log.info({ actorId: actor.actorId, role: actor.role, count: scoped.length }, 'scan list viewed');
 
-  return { scans };
+  return { scans: scoped };
 });
 
 app.get('/api/v1/scans/:scanId', async (req, reply) => {
@@ -221,6 +353,9 @@ app.get('/api/v1/scans/:scanId', async (req, reply) => {
   const scan = await getScan(scanId);
   if (!scan) {
     return reply.code(404).send({ error: 'Scan not found' });
+  }
+  if (!ensureProjectScope(actor, scan.projectId)) {
+    return reply.code(403).send({ error: 'project_scope_denied', projectId: scan.projectId });
   }
 
   app.log.info({ actorId: actor.actorId, role: actor.role, scanId }, 'scan viewed');
@@ -236,6 +371,9 @@ app.get('/api/v1/scans/:scanId/events', async (req, reply) => {
   if (!scan) {
     return reply.code(404).send({ error: 'Scan not found' });
   }
+  if (!ensureProjectScope(actor, scan.projectId)) {
+    return reply.code(403).send({ error: 'project_scope_denied', projectId: scan.projectId });
+  }
 
   const events = await listScanEvents(scanId, 200);
   app.log.info({ actorId: actor.actorId, role: actor.role, scanId, count: events.length }, 'scan events viewed');
@@ -247,7 +385,8 @@ app.get('/api/v1/scan-schedules', async (req, reply) => {
   if (!actor) return;
 
   const rows = await prisma.scanSchedule.findMany({ orderBy: { createdAt: 'desc' }, take: 200 });
-  return { schedules: rows };
+  const schedules = actor.projects.includes('*') ? rows : rows.filter((r) => ensureProjectScope(actor, r.projectId));
+  return { schedules };
 });
 
 app.post('/api/v1/scan-schedules', async (req, reply) => {
@@ -266,6 +405,10 @@ app.post('/api/v1/scan-schedules', async (req, reply) => {
 
   if (!body?.name || !body?.cronExpr || !body?.projectId || !body?.requestedBy || !Array.isArray(body?.targets) || body.targets.length === 0) {
     return reply.code(400).send({ error: 'invalid_schedule_payload' });
+  }
+
+  if (!ensureProjectScope(actor, body.projectId.trim())) {
+    return reply.code(403).send({ error: 'project_scope_denied', projectId: body.projectId.trim() });
   }
 
   const timezone = (body.timezone || 'Australia/Melbourne').trim();
@@ -296,6 +439,9 @@ app.post('/api/v1/scan-schedules/:scheduleId/toggle', async (req, reply) => {
 
   const row = await prisma.scanSchedule.findUnique({ where: { id: scheduleId } });
   if (!row) return reply.code(404).send({ error: 'Schedule not found' });
+  if (!ensureProjectScope(actor, row.projectId)) {
+    return reply.code(403).send({ error: 'project_scope_denied', projectId: row.projectId });
+  }
 
   const nextEnabled = !row.enabled;
   const updated = await prisma.scanSchedule.update({
@@ -309,7 +455,7 @@ app.post('/api/v1/scan-schedules/:scheduleId/toggle', async (req, reply) => {
 });
 
 app.post('/api/v1/scan-schedules/run-due', async (req, reply) => {
-  const actor = requireRole(req, reply, 'staff');
+  const actor = requireRole(req, reply, 'admin');
   if (!actor) return;
   const result = await runDueSchedules();
   return result;

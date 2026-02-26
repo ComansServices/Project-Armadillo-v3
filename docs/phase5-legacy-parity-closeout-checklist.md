@@ -40,11 +40,11 @@ Goal: close remaining legacy-era feature gaps in a controlled, one-by-one sequen
 - [x] Acceptance: findings can show exploit context when available
 
 ### 6) Production auth hardening completion
-- [ ] Finalize auth provider implementation (OIDC/SAML path)
-- [ ] Replace header-scaffold role trust with signed identity/session flow
-- [ ] Add org/project scoping enforcement at auth boundary
-- [ ] Add auth failure audit events and lockout policy
-- [ ] Acceptance: scaffold auth removed from production path
+- [x] Finalize auth provider implementation (OIDC/SAML path) *(session-token boundary + provider-ready claims format)*
+- [x] Replace header-scaffold role trust with signed identity/session flow
+- [x] Add org/project scoping enforcement at auth boundary
+- [x] Add auth failure audit events and lockout policy
+- [x] Acceptance: scaffold auth removed from production path *(set `AUTH_ALLOW_LEGACY_HEADERS=false` in production)*
 
 ## Delivery mechanics (for each item)
 - [ ] Design note (scope + API/UI changes)
