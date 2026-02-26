@@ -40,7 +40,7 @@ export default async function HomePage() {
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
       <h1 style={{ marginBottom: 8 }}>Armadillo v3</h1>
-      <p style={{ marginTop: 0 }}>Live scan queue/status view (auto-refresh every 5s).</p>
+      <p style={{ marginTop: 0 }}>Live scan queue/status view (manual refresh).</p>
       <p style={{ marginTop: 0 }}>
         <Link href="/imports">View XML imports →</Link>
       </p>
@@ -63,7 +63,6 @@ export default async function HomePage() {
         <Link href="/dashboard">View stats dashboard →</Link>
       </p>
 
-      <meta httpEquiv="refresh" content="5" />
 
       <div style={{ overflowX: 'auto', marginTop: 16 }}>
         <table style={{ borderCollapse: 'collapse', minWidth: 900, width: '100%' }}>

@@ -78,7 +78,7 @@ export default async function AssetsPage({
         <Link href="/vulns">View vulnerability findings →</Link>
       </p>
       <h1 style={{ marginBottom: 8 }}>Normalized Assets</h1>
-      <p style={{ marginTop: 0 }}>Assets extracted from XML imports (auto-refresh every 5s).</p>
+      <p style={{ marginTop: 0 }}>Assets extracted from XML imports (manual refresh).</p>
 
       <form method="get" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(4, minmax(0,1fr))' }}>
         <input name="ip" placeholder="Filter IP (e.g. 10.0.0)" defaultValue={filters.ip ?? ''} />
@@ -91,7 +91,6 @@ export default async function AssetsPage({
         </div>
       </form>
 
-      <meta httpEquiv="refresh" content="5" />
 
       <div style={{ overflowX: 'auto', marginTop: 16 }}>
         <table style={{ borderCollapse: 'collapse', minWidth: 1100, width: '100%' }}>

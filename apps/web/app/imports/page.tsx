@@ -133,7 +133,7 @@ export default async function ImportsPage({
         <Link href="/">← Back to scans</Link>
       </p>
       <h1 style={{ marginBottom: 8 }}>XML Imports</h1>
-      <p style={{ marginTop: 0 }}>Latest imported XML payloads (auto-refresh every 5s).</p>
+      <p style={{ marginTop: 0 }}>Latest imported XML payloads (manual refresh).</p>
       <p style={{ marginTop: 0 }}>
         <Link href="/assets">View normalized assets →</Link>
       </p>
@@ -143,7 +143,6 @@ export default async function ImportsPage({
         </a>
       </p>
 
-      <meta httpEquiv="refresh" content="5" />
 
       <h2 style={{ marginTop: 20, marginBottom: 8 }}>Import Source Policies</h2>
       {policySaved ? (

@@ -165,7 +165,6 @@ export default async function ScanDetailPage({
       ) : null}
 
       <h2 style={{ marginBottom: 8 }}>Timeline</h2>
-      <meta httpEquiv="refresh" content="5" />
       <div style={{ overflowX: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', minWidth: 900, width: '100%' }}>
           <thead>
