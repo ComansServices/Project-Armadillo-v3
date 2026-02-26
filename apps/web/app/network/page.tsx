@@ -111,9 +111,9 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
 
       <form method="get" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
         <input type="hidden" name="layout" value={layout} />
-        <input name="importId" placeholder="Filter import ID" defaultValue={importId} style={{ minWidth: 320 }} />
-        <input name="subnet" placeholder="Subnet prefix (e.g. 10.0.0.)" defaultValue={subnet} style={{ minWidth: 220 }} />
-        <input name="service" placeholder="Service tag (e.g. ssh)" defaultValue={service} style={{ minWidth: 220 }} />
+        <input name="importId" placeholder="Filter import ID" defaultValue={importId} style={{ minWidth: 220, width: 'min(100%, 320px)' }} />
+        <input name="subnet" placeholder="Subnet prefix (e.g. 10.0.0.)" defaultValue={subnet} style={{ minWidth: 180, width: 'min(100%, 260px)' }} />
+        <input name="service" placeholder="Service tag (e.g. ssh)" defaultValue={service} style={{ minWidth: 180, width: 'min(100%, 260px)' }} />
         <input name="port" placeholder="Port (e.g. 22)" defaultValue={port} style={{ width: 120 }} />
         <button type="submit">Apply</button>
         <Link href="/network">Reset</Link>
@@ -133,7 +133,7 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
       </div>
 
       <h2 style={{ marginBottom: 8 }}>{layout === 'subnet' ? 'Subnet lanes view' : 'Service-centric topology'}</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 16 }}>
         <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: 8, overflowX: 'auto', background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)' }}>
           {layout === 'subnet' ? (
             <div style={{ display: 'grid', gap: 10 }}>
@@ -151,7 +151,7 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
               ))}
             </div>
           ) : (
-            <svg width={920} height={390} viewBox="0 0 920 390" role="img" aria-label="Network topology mini map">
+            <svg width="100%" height={390} viewBox="0 0 920 390" preserveAspectRatio="xMinYMin meet" role="img" aria-label="Network topology mini map">
               <rect x="0" y="0" width="920" height="390" fill="#f8fafc" />
 
               {graphLinks.map((l, idx) => {
