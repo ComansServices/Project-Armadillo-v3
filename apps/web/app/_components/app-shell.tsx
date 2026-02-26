@@ -81,6 +81,41 @@ export function AppShell({
       </div>
 
       {children}
+
+      <style>{`
+        :where(button, input, select, textarea) {
+          border-radius: 8px;
+          border: 1px solid #cbd5e1;
+          padding: 7px 10px;
+          font: inherit;
+          background: #fff;
+          color: #0f172a;
+        }
+
+        :where(button) {
+          background: #0f172a;
+          color: #fff;
+          border-color: #0f172a;
+          cursor: pointer;
+          font-weight: 600;
+        }
+
+        :where(button:disabled) {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+
+        :where(table thead th) {
+          background: #f8fafc;
+        }
+
+        :where(code) {
+          background: #f1f5f9;
+          border: 1px solid #e2e8f0;
+          border-radius: 6px;
+          padding: 1px 5px;
+        }
+      `}</style>
     </main>
   );
 }
