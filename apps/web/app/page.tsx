@@ -59,6 +59,9 @@ export default async function HomePage() {
       <p style={{ marginTop: 0 }}>
         <Link href="/network">View network topology →</Link>
       </p>
+      <p style={{ marginTop: 0 }}>
+        <Link href="/dashboard">View stats dashboard →</Link>
+      </p>
 
       <meta httpEquiv="refresh" content="5" />
 

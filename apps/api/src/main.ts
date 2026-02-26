@@ -937,6 +937,79 @@ app.get('/api/v1/network', async (req, reply) => {
   };
 });
 
+app.get('/api/v1/dashboard/summary', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { days, format } = req.query as { days?: string; format?: string };
+  const windowDays = Math.min(Math.max(Number(days ?? 14), 1), 90);
+  const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+  const [assetCount, importCount, scanCount, vulnRows, assets] = await Promise.all([
+    prisma.asset.count(),
+    prisma.xmlImport.count(),
+    prisma.scan.count(),
+    prisma.assetVulnerability.findMany({ where: { detectedAt: { gte: since } }, select: { severity: true, detectedAt: true } }),
+    prisma.asset.findMany({ take: 1500, select: { ports: true, serviceTags: true, os: true } })
+  ]);
+
+  const sev = { critical: 0, high: 0, medium: 0, low: 0 };
+  for (const r of vulnRows) {
+    const s = String(r.severity || '').toLowerCase();
+    if (s in sev) (sev as Record<string, number>)[s] += 1;
+  }
+
+  const serviceCounts: Record<string, number> = {};
+  const portCounts: Record<string, number> = {};
+  const osCounts: Record<string, number> = {};
+
+  for (const a of assets) {
+    for (const s of a.serviceTags.slice(0, 20)) serviceCounts[s] = (serviceCounts[s] ?? 0) + 1;
+    for (const p of a.ports.slice(0, 40)) {
+      const k = String(p);
+      portCounts[k] = (portCounts[k] ?? 0) + 1;
+    }
+    const os = (a.os || 'unknown').trim().toLowerCase();
+    osCounts[os] = (osCounts[os] ?? 0) + 1;
+  }
+
+  const top = (obj: Record<string, number>, n = 8) =>
+    Object.entries(obj)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, n)
+      .map(([label, count]) => ({ label, count }));
+
+  const summary = {
+    totals: {
+      assets: assetCount,
+      imports: importCount,
+      scans: scanCount,
+      vulnsWindow: vulnRows.length
+    },
+    severity: sev,
+    topServices: top(serviceCounts),
+    topPorts: top(portCounts),
+    topOs: top(osCounts),
+    windowDays
+  };
+
+  if (format === 'csv') {
+    const rows = [
+      'section,label,count',
+      ...Object.entries(summary.totals).map(([k, v]) => `totals,${k},${v}`),
+      ...Object.entries(summary.severity).map(([k, v]) => `severity,${k},${v}`),
+      ...summary.topServices.map((r) => `topServices,${r.label},${r.count}`),
+      ...summary.topPorts.map((r) => `topPorts,${r.label},${r.count}`),
+      ...summary.topOs.map((r) => `topOs,${r.label},${r.count}`)
+    ];
+    reply.header('content-type', 'text/csv; charset=utf-8');
+    reply.header('content-disposition', 'attachment; filename="armadillo-dashboard-summary.csv"');
+    return rows.join('\n');
+  }
+
+  return summary;
+});
+
 app.get('/api/v1/reports', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
