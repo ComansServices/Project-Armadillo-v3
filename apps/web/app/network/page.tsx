@@ -134,7 +134,7 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
 
       <h2 style={{ marginBottom: 8 }}>{layout === 'subnet' ? 'Subnet lanes view' : 'Service-centric topology'}</h2>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 12, marginBottom: 16 }}>
-        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 8, overflowX: 'auto', background: '#fcfcfd' }}>
+        <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: 8, overflowX: 'auto', background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)' }}>
           {layout === 'subnet' ? (
             <div style={{ display: 'grid', gap: 10 }}>
               {Object.entries(subnetGroups).map(([lane, laneAssets]) => (
@@ -152,21 +152,21 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
             </div>
           ) : (
             <svg width={920} height={390} viewBox="0 0 920 390" role="img" aria-label="Network topology mini map">
-              <rect x="0" y="0" width="920" height="390" fill="#fcfcfd" />
+              <rect x="0" y="0" width="920" height="390" fill="#f8fafc" />
 
               {graphLinks.map((l, idx) => {
                 const a = assetPos.get(l.source)!;
                 const s = servicePos.get(l.target)!;
-                return <line key={`${l.source}-${l.target}-${idx}`} x1={s.x} y1={s.y + 12} x2={a.x} y2={a.y - 10} stroke="#d1d5db" strokeWidth={1.2} />;
+                return <line key={`${l.source}-${l.target}-${idx}`} x1={s.x} y1={s.y + 12} x2={a.x} y2={a.y - 10} stroke="#94a3b8" strokeOpacity={0.55} strokeWidth={1.4} />;
               })}
 
               {serviceNodesForGraph.map((s) => {
                 const p = servicePos.get(s.id)!;
                 return (
                   <g key={s.id}>
-                    <circle cx={p.x} cy={p.y} r={12} fill="#7c3aed" />
+                    <circle cx={p.x} cy={p.y} r={12} fill="#6d28d9" />
                     <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="9" fill="#fff">S</text>
-                    <text x={p.x} y={p.y + 26} textAnchor="middle" fontSize="9" fill="#4b5563">{s.label}</text>
+                    <text x={p.x} y={p.y + 26} textAnchor="middle" fontSize="9" fill="#334155">{s.label}</text>
                   </g>
                 );
               })}
@@ -176,18 +176,38 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
                 const short = a.label.length > 18 ? `${a.label.slice(0, 18)}…` : a.label;
                 return (
                   <g key={a.id}>
-                    <rect x={p.x - 45} y={p.y - 16} width={90} height={32} rx={8} fill="#0ea5e9" />
+                    <rect x={p.x - 45} y={p.y - 16} width={90} height={32} rx={8} fill="#0284c7" />
                     <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="9" fill="#fff">A</text>
-                    <text x={p.x} y={p.y + 30} textAnchor="middle" fontSize="8.5" fill="#1f2937">{short}</text>
+                    <text x={p.x} y={p.y + 30} textAnchor="middle" fontSize="8.5" fill="#0f172a">{short}</text>
                   </g>
                 );
               })}
             </svg>
           )}
+
+          {layout !== 'subnet' ? (
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {assetNodes.map((a) => (
+                <Link
+                  key={a.id}
+                  href={`/network?layout=${layout}&importId=${encodeURIComponent(importId)}&subnet=${encodeURIComponent(subnet)}&service=${encodeURIComponent(service)}&port=${encodeURIComponent(port)}&node=${encodeURIComponent(a.id)}`}
+                  style={{
+                    border: selectedNode === a.id ? '1px solid #0ea5e9' : '1px solid #cbd5e1',
+                    background: selectedNode === a.id ? '#e0f2fe' : '#ffffff',
+                    borderRadius: 999,
+                    padding: '4px 10px',
+                    fontSize: 12
+                  }}
+                >
+                  {a.label}
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </div>
 
-        <aside style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, background: '#fff' }}>
-          <h3 style={{ marginTop: 0 }}>Entity panel</h3>
+        <aside style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: 12, background: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }}>
+          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Entity panel</h3>
           {!selected ? (
             <p style={{ color: '#666' }}>Select a node using <code>?node=...</code> or click an asset chip in subnet mode.</p>
           ) : (
