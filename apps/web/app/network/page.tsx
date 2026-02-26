@@ -50,6 +50,8 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
   const subnet = typeof params?.subnet === 'string' ? params.subnet : '';
   const service = typeof params?.service === 'string' ? params.service : '';
   const port = typeof params?.port === 'string' ? params.port : '';
+  const layout = typeof params?.layout === 'string' ? params.layout : 'service';
+  const selectedNode = typeof params?.node === 'string' ? params.node : '';
 
   const data = await getNetwork({
     importId: importId || undefined,
@@ -89,6 +91,16 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
     .filter((l) => l.kind === 'has-service' && assetPos.has(l.source) && servicePos.has(l.target))
     .slice(0, 80);
 
+  const selected = data.nodes.find((n) => n.id === selectedNode);
+  const selectedMeta = (selected?.meta ?? {}) as Record<string, unknown>;
+
+  const subnetGroups = assets.reduce<Record<string, typeof assets>>((acc, a) => {
+    const ip = typeof a.meta?.ip === 'string' ? (a.meta.ip as string) : 'unknown';
+    const lane = ip === 'unknown' ? 'unknown' : ip.split('.').slice(0, 3).join('.') + '.x';
+    (acc[lane] ||= []).push(a);
+    return acc;
+  }, {} as Record<string, typeof assets>);
+
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
       <p style={{ marginBottom: 12 }}>
@@ -98,6 +110,7 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
       <p style={{ marginTop: 0 }}>Phase 5 Item 2: asset-to-port/service relationship view.</p>
 
       <form method="get" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+        <input type="hidden" name="layout" value={layout} />
         <input name="importId" placeholder="Filter import ID" defaultValue={importId} style={{ minWidth: 320 }} />
         <input name="subnet" placeholder="Subnet prefix (e.g. 10.0.0.)" defaultValue={subnet} style={{ minWidth: 220 }} />
         <input name="service" placeholder="Service tag (e.g. ssh)" defaultValue={service} style={{ minWidth: 220 }} />
@@ -106,6 +119,12 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
         <Link href="/network">Reset</Link>
       </form>
 
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <Link href={`/network?layout=service&importId=${encodeURIComponent(importId)}&subnet=${encodeURIComponent(subnet)}&service=${encodeURIComponent(service)}&port=${encodeURIComponent(port)}`}>Service-centric layout</Link>
+        <span>·</span>
+        <Link href={`/network?layout=subnet&importId=${encodeURIComponent(importId)}&subnet=${encodeURIComponent(subnet)}&service=${encodeURIComponent(service)}&port=${encodeURIComponent(port)}`}>Subnet lanes layout</Link>
+      </div>
+
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 130 }}><strong>Assets</strong><div>{data.summary.assets}</div></div>
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 130 }}><strong>Ports</strong><div>{portNodes.length}</div></div>
@@ -113,50 +132,77 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 130 }}><strong>Links</strong><div>{data.summary.links}</div></div>
       </div>
 
-      <h2 style={{ marginBottom: 8 }}>Topology mini-map</h2>
-      <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 8, marginBottom: 16, overflowX: 'auto', background: '#fcfcfd' }}>
-        <svg width={920} height={390} viewBox="0 0 920 390" role="img" aria-label="Network topology mini map">
-          <rect x="0" y="0" width="920" height="390" fill="#fcfcfd" />
+      <h2 style={{ marginBottom: 8 }}>{layout === 'subnet' ? 'Subnet lanes view' : 'Service-centric topology'}</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 12, marginBottom: 16 }}>
+        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 8, overflowX: 'auto', background: '#fcfcfd' }}>
+          {layout === 'subnet' ? (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {Object.entries(subnetGroups).map(([lane, laneAssets]) => (
+                <div key={lane} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 10, background: '#fff' }}>
+                  <strong>{lane}</strong>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                    {laneAssets.map((a) => (
+                      <Link key={a.id} href={`/network?layout=${layout}&importId=${encodeURIComponent(importId)}&subnet=${encodeURIComponent(subnet)}&service=${encodeURIComponent(service)}&port=${encodeURIComponent(port)}&node=${encodeURIComponent(a.id)}`} style={{ border: '1px solid #d1d5db', borderRadius: 999, padding: '4px 10px', fontSize: 12 }}>
+                        {a.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <svg width={920} height={390} viewBox="0 0 920 390" role="img" aria-label="Network topology mini map">
+              <rect x="0" y="0" width="920" height="390" fill="#fcfcfd" />
 
-          {graphLinks.map((l, idx) => {
-            const a = assetPos.get(l.source)!;
-            const s = servicePos.get(l.target)!;
-            return (
-              <line
-                key={`${l.source}-${l.target}-${idx}`}
-                x1={s.x}
-                y1={s.y + 12}
-                x2={a.x}
-                y2={a.y - 10}
-                stroke="#d1d5db"
-                strokeWidth={1.2}
-              />
-            );
-          })}
+              {graphLinks.map((l, idx) => {
+                const a = assetPos.get(l.source)!;
+                const s = servicePos.get(l.target)!;
+                return <line key={`${l.source}-${l.target}-${idx}`} x1={s.x} y1={s.y + 12} x2={a.x} y2={a.y - 10} stroke="#d1d5db" strokeWidth={1.2} />;
+              })}
 
-          {serviceNodesForGraph.map((s) => {
-            const p = servicePos.get(s.id)!;
-            return (
-              <g key={s.id}>
-                <circle cx={p.x} cy={p.y} r={12} fill="#7c3aed" />
-                <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="9" fill="#fff">S</text>
-                <text x={p.x} y={p.y + 26} textAnchor="middle" fontSize="9" fill="#4b5563">{s.label}</text>
-              </g>
-            );
-          })}
+              {serviceNodesForGraph.map((s) => {
+                const p = servicePos.get(s.id)!;
+                return (
+                  <g key={s.id}>
+                    <circle cx={p.x} cy={p.y} r={12} fill="#7c3aed" />
+                    <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="9" fill="#fff">S</text>
+                    <text x={p.x} y={p.y + 26} textAnchor="middle" fontSize="9" fill="#4b5563">{s.label}</text>
+                  </g>
+                );
+              })}
 
-          {assetNodes.map((a) => {
-            const p = assetPos.get(a.id)!;
-            const short = a.label.length > 18 ? `${a.label.slice(0, 18)}…` : a.label;
-            return (
-              <g key={a.id}>
-                <rect x={p.x - 45} y={p.y - 16} width={90} height={32} rx={8} fill="#0ea5e9" />
-                <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="9" fill="#fff">A</text>
-                <text x={p.x} y={p.y + 30} textAnchor="middle" fontSize="8.5" fill="#1f2937">{short}</text>
-              </g>
-            );
-          })}
-        </svg>
+              {assetNodes.map((a) => {
+                const p = assetPos.get(a.id)!;
+                const short = a.label.length > 18 ? `${a.label.slice(0, 18)}…` : a.label;
+                return (
+                  <g key={a.id}>
+                    <rect x={p.x - 45} y={p.y - 16} width={90} height={32} rx={8} fill="#0ea5e9" />
+                    <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="9" fill="#fff">A</text>
+                    <text x={p.x} y={p.y + 30} textAnchor="middle" fontSize="8.5" fill="#1f2937">{short}</text>
+                  </g>
+                );
+              })}
+            </svg>
+          )}
+        </div>
+
+        <aside style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, background: '#fff' }}>
+          <h3 style={{ marginTop: 0 }}>Entity panel</h3>
+          {!selected ? (
+            <p style={{ color: '#666' }}>Select a node using <code>?node=...</code> or click an asset chip in subnet mode.</p>
+          ) : (
+            <div style={{ fontSize: 13 }}>
+              <p><strong>ID:</strong> {selected.id}</p>
+              <p><strong>Type:</strong> {selected.type}</p>
+              <p><strong>Label:</strong> {selected.label}</p>
+              <p><strong>Import:</strong> {String(selectedMeta.importId ?? '-')}</p>
+              <p><strong>IP:</strong> {String(selectedMeta.ip ?? '-')}</p>
+              <p><strong>Hostname:</strong> {String(selectedMeta.hostname ?? '-')}</p>
+              <p><strong>Ports:</strong> {Array.isArray(selectedMeta.ports) ? selectedMeta.ports.join(', ') : '-'}</p>
+              <p><strong>Services:</strong> {Array.isArray(selectedMeta.serviceTags) ? selectedMeta.serviceTags.join(', ') : '-'}</p>
+            </div>
+          )}
+        </aside>
       </div>
 
       <h2 style={{ marginBottom: 8 }}>Service groups</h2>
