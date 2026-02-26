@@ -1,4 +1,6 @@
 import { Queue, Worker } from 'bullmq';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { SCAN_QUEUE_NAME } from '../../api/src/queue';
 import { updateScan } from '../../api/src/store';
 import type { ScanJobPayload } from '@armadillo/types/src/pipeline';
@@ -11,6 +13,9 @@ const connection = {
 
 const queue = new Queue(SCAN_QUEUE_NAME, { connection });
 const apiBaseUrl = process.env.API_BASE_URL ?? 'http://api:4000';
+const execFileAsync = promisify(execFile);
+const teamsWebhookBin = process.env.TEAMS_WEBHOOK_BIN ?? `${process.env.HOME ?? ''}/.openclaw/skills/teams-webhook/teams-webhook`;
+const teamsRecipient = process.env.TEAMS_RECIPIENT ?? 'Jason';
 
 async function archiveScanReports(scanId: string) {
   for (const audience of ['ops', 'exec'] as const) {
@@ -29,6 +34,18 @@ async function archiveScanReports(scanId: string) {
       const e = err as Error;
       console.warn(`[worker] auto-report archive error scanId=${scanId} audience=${audience} err=${e.message}`);
     }
+  }
+}
+
+async function sendFailureAlert(scanId: string, message: string) {
+  if (!teamsWebhookBin) return;
+  const title = '🚨 Armadillo Scan Failure';
+  const text = `scanId=${scanId}\nreason=${message.slice(0, 220)}\nscan=<http://localhost:3000/scans/${scanId}>`;
+  try {
+    await execFileAsync(teamsWebhookBin, [title, text, teamsRecipient]);
+  } catch (err) {
+    const e = err as Error;
+    console.warn(`[worker] teams failure alert send failed scanId=${scanId} err=${e.message}`);
   }
 }
 
@@ -106,6 +123,7 @@ worker.on('failed', async (job, err) => {
   const scanId = job?.data?.scanId;
   if (scanId) {
     await updateScan(scanId, { status: 'failed' }, { status: 'failed', message: err.message });
+    await sendFailureAlert(scanId, err.message);
   }
 });
 
