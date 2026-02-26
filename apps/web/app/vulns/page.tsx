@@ -29,10 +29,10 @@ const sevRank: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 
 
 function sevStyle(sev: string) {
   const s = sev.toLowerCase();
-  if (s === 'critical') return { background: '#7f1d1d', color: '#fff' };
-  if (s === 'high') return { background: '#b91c1c', color: '#fff' };
-  if (s === 'medium') return { background: '#92400e', color: '#fff' };
-  return { background: '#1f2937', color: '#fff' };
+  if (s === 'critical') return { background: '#7f1d1d', color: '#fee2e2', border: '1px solid #ef4444' };
+  if (s === 'high') return { background: '#991b1b', color: '#fecaca', border: '1px solid #f87171' };
+  if (s === 'medium') return { background: '#78350f', color: '#fde68a', border: '1px solid #f59e0b' };
+  return { background: '#1f2937', color: '#d1d5db', border: '1px solid #4b5563' };
 }
 
 async function getFindings(filters: { importId?: string; severity?: string }) {
@@ -92,7 +92,7 @@ export default async function VulnsPage({
         <Link href="/">← Back to scans</Link>
       </p>
       <h1 style={{ marginBottom: 8 }}>Vulnerability Findings</h1>
-      <p style={{ marginTop: 0 }}>CVE/CPE enrichment results from import assets.</p>
+      <p style={{ marginTop: 0 }}>CVE/CPE enrichment results from import assets. CSV export includes source and description fields for analyst handoff.</p>
 
       <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <input name="importId" placeholder="Filter import ID" defaultValue={filters.importId ?? ''} style={{ minWidth: 360 }} />
@@ -145,7 +145,21 @@ export default async function VulnsPage({
                     <tr key={f.id}>
                       <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{new Date(f.detectedAt).toLocaleString()}</td>
                       <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                        <span style={{ ...sevStyle(f.severity), padding: '2px 8px', borderRadius: 999, textTransform: 'uppercase', fontSize: 12 }}>
+                        <span
+                          style={{
+                            ...sevStyle(f.severity),
+                            padding: '2px 10px',
+                            borderRadius: 999,
+                            textTransform: 'uppercase',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            letterSpacing: 0.4,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6
+                          }}
+                        >
+                          <span aria-hidden="true">●</span>
                           {f.severity}
                         </span>
                       </td>

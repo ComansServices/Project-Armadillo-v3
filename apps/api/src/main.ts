@@ -604,7 +604,21 @@ app.get('/api/v1/vulns', async (req, reply) => {
 
   if (format === 'csv') {
     const esc = (v: unknown) => `"${String(v ?? '').replaceAll('"', '""')}"`;
-    const header = ['detectedAt', 'severity', 'cve', 'cvss', 'cpe', 'assetId', 'identityKey', 'ip', 'hostname', 'importId', 'title'];
+    const header = [
+      'detectedAt',
+      'severity',
+      'cve',
+      'cvss',
+      'cpe',
+      'source',
+      'assetId',
+      'identityKey',
+      'ip',
+      'hostname',
+      'importId',
+      'title',
+      'description'
+    ];
     const lines = [header.join(',')];
     for (const r of rows) {
       lines.push(
@@ -614,12 +628,14 @@ app.get('/api/v1/vulns', async (req, reply) => {
           r.cve,
           r.cvss ?? '',
           r.cpe ?? '',
+          r.source ?? '',
           r.asset.id,
           r.asset.identityKey,
           r.asset.ip ?? '',
           r.asset.hostname ?? '',
           r.importId,
-          r.title ?? ''
+          r.title ?? '',
+          r.description ?? ''
         ]
           .map(esc)
           .join(',')

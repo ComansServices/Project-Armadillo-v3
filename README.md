@@ -9,8 +9,8 @@ Modern, queue-driven network discovery and security visibility platform.
 - Shared pipeline contracts (`packages/types`)
 - PostgreSQL + Prisma migrations (`apps/api/prisma`)
 
-## Progress snapshot (as of 2026-02-25, end of day)
-Implemented through **Step 20**:
+## Progress snapshot (as of 2026-02-26)
+Implemented through **Step 23 kickoff**:
 - ✅ Scan queue + status + event timeline (`/api/v1/scans`, `/api/v1/scans/:scanId/events`)
 - ✅ XML import pipeline (`POST /api/v1/imports/xml`) with strict/lenient quality modes
 - ✅ Import analytics:
@@ -31,12 +31,26 @@ Implemented through **Step 20**:
   - quality panels/trend/CSV export
   - policy visibility + admin editor
   - role-aware read-only mode + save success/error feedback
+- ✅ Step 21 complete:
+  - asset/import annotations (labels + notes)
+  - scan/import diff endpoints + UI
+  - CSV diff exports + quick baseline selectors + compare-latest shortcut
+- ✅ Step 22 complete (MVP + Phase 2):
+  - CVE/CPE enrichment model + service + trigger endpoint
+  - vulnerability list page (`/vulns`) with filters/sort/grouping
+  - CSV export (`/api/v1/vulns?format=csv`) including source + description fields
+- ✅ Step 23 kickoff:
+  - PDF exports for imports and scans:
+    - `GET /api/v1/reports/imports/:importId.pdf`
+    - `GET /api/v1/reports/scans/:scanId.pdf`
+  - UI wired to report links from import and scan detail pages
 
 ### Current stop point
-- Next planned dev pickup: **Step 21 / Phase 1**
-  - asset/import annotations (labels + notes)
-  - import/scan diff endpoint + UI
-- Dev stack has been intentionally brought down for overnight break (`make down`).
+- Next planned dev pickup: **Step 23 polish**
+  - branded PDF layout (tables/sections)
+  - optional chart snapshot embeds
+  - report templates per audience (ops vs exec)
+- Then continue roadmap to next feature tranche.
 
 ## Pipeline (v1 practical combo)
 `naabu -> nmap -> httpx -> nuclei`
