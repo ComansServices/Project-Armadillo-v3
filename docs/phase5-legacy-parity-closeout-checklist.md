@@ -13,10 +13,10 @@ Goal: close remaining legacy-era feature gaps in a controlled, one-by-one sequen
 - [x] Acceptance: user can schedule scans from UI and see execution lifecycle
 
 ### 2) Network view / topology page
-- [ ] Define network graph data endpoint (nodes, links, metadata)
-- [ ] Implement `/network` page with host/service relationships
+- [x] Define network graph data endpoint (nodes, links, metadata)
+- [x] Implement `/network` page with host/service relationships
 - [ ] Add filters (import, subnet, service tag, open ports)
-- [ ] Add click-through to host/asset detail
+- [x] Add click-through to host/asset detail
 - [ ] Acceptance: parity-level network map usable for triage and discovery
 
 ### 3) Stats & charts dashboard parity

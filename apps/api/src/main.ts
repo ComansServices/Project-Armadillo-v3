@@ -853,6 +853,72 @@ app.get('/api/v1/assets/:assetId/vulns', async (req, reply) => {
   return { findings: rows };
 });
 
+app.get('/api/v1/network', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const { importId, limit } = req.query as { importId?: string; limit?: string };
+  const take = Math.min(Math.max(Number(limit ?? 300), 1), 1000);
+
+  const assets = await prisma.asset.findMany({
+    where: importId ? { importId } : undefined,
+    orderBy: { createdAt: 'desc' },
+    take,
+    select: {
+      id: true,
+      identityKey: true,
+      importId: true,
+      ip: true,
+      hostname: true,
+      ports: true,
+      serviceTags: true
+    }
+  });
+
+  const nodes: Array<{ id: string; type: 'asset' | 'port' | 'service'; label: string; meta?: Record<string, unknown> }> = [];
+  const links: Array<{ source: string; target: string; kind: 'has-port' | 'has-service' }> = [];
+
+  const seenNodes = new Set<string>();
+  const addNode = (id: string, type: 'asset' | 'port' | 'service', label: string, meta?: Record<string, unknown>) => {
+    if (seenNodes.has(id)) return;
+    seenNodes.add(id);
+    nodes.push({ id, type, label, meta });
+  };
+
+  for (const a of assets) {
+    const assetNodeId = `asset:${a.id}`;
+    addNode(assetNodeId, 'asset', a.identityKey, {
+      importId: a.importId,
+      ip: a.ip,
+      hostname: a.hostname,
+      ports: a.ports,
+      serviceTags: a.serviceTags
+    });
+
+    for (const p of a.ports.slice(0, 25)) {
+      const portNodeId = `port:${p}`;
+      addNode(portNodeId, 'port', `port ${p}`);
+      links.push({ source: assetNodeId, target: portNodeId, kind: 'has-port' });
+    }
+
+    for (const s of a.serviceTags.slice(0, 20)) {
+      const serviceNodeId = `service:${s}`;
+      addNode(serviceNodeId, 'service', s);
+      links.push({ source: assetNodeId, target: serviceNodeId, kind: 'has-service' });
+    }
+  }
+
+  return {
+    summary: {
+      assets: assets.length,
+      nodes: nodes.length,
+      links: links.length
+    },
+    nodes,
+    links
+  };
+});
+
 app.get('/api/v1/reports', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;

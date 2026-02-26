@@ -56,6 +56,9 @@ export default async function HomePage() {
       <p style={{ marginTop: 0 }}>
         <Link href="/schedules">Manage scan schedules →</Link>
       </p>
+      <p style={{ marginTop: 0 }}>
+        <Link href="/network">View network topology →</Link>
+      </p>
 
       <meta httpEquiv="refresh" content="5" />
 
