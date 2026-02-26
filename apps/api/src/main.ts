@@ -857,11 +857,22 @@ app.get('/api/v1/network', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
 
-  const { importId, limit } = req.query as { importId?: string; limit?: string };
+  const { importId, limit, subnet, service, port } = req.query as {
+    importId?: string;
+    limit?: string;
+    subnet?: string;
+    service?: string;
+    port?: string;
+  };
   const take = Math.min(Math.max(Number(limit ?? 300), 1), 1000);
 
+  const parsedPort = port ? Number(port) : undefined;
   const assets = await prisma.asset.findMany({
-    where: importId ? { importId } : undefined,
+    where: {
+      ...(importId ? { importId } : {}),
+      ...(service ? { serviceTags: { has: service } } : {}),
+      ...(Number.isFinite(parsedPort) ? { ports: { has: parsedPort as number } } : {})
+    },
     orderBy: { createdAt: 'desc' },
     take,
     select: {
@@ -875,6 +886,13 @@ app.get('/api/v1/network', async (req, reply) => {
     }
   });
 
+  const subnetFiltered = subnet
+    ? assets.filter((a) => {
+        const ip = a.ip ?? '';
+        return ip.startsWith(subnet);
+      })
+    : assets;
+
   const nodes: Array<{ id: string; type: 'asset' | 'port' | 'service'; label: string; meta?: Record<string, unknown> }> = [];
   const links: Array<{ source: string; target: string; kind: 'has-port' | 'has-service' }> = [];
 
@@ -885,7 +903,7 @@ app.get('/api/v1/network', async (req, reply) => {
     nodes.push({ id, type, label, meta });
   };
 
-  for (const a of assets) {
+  for (const a of subnetFiltered) {
     const assetNodeId = `asset:${a.id}`;
     addNode(assetNodeId, 'asset', a.identityKey, {
       importId: a.importId,
@@ -910,7 +928,7 @@ app.get('/api/v1/network', async (req, reply) => {
 
   return {
     summary: {
-      assets: assets.length,
+      assets: subnetFiltered.length,
       nodes: nodes.length,
       links: links.length
     },

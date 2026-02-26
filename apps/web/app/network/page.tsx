@@ -25,9 +25,12 @@ const authHeaders = {
   'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
 };
 
-async function getNetwork(importId?: string): Promise<NetworkResponse> {
+async function getNetwork(filters: { importId?: string; subnet?: string; service?: string; port?: string }): Promise<NetworkResponse> {
   const qs = new URLSearchParams();
-  if (importId) qs.set('importId', importId);
+  if (filters.importId) qs.set('importId', filters.importId);
+  if (filters.subnet) qs.set('subnet', filters.subnet);
+  if (filters.service) qs.set('service', filters.service);
+  if (filters.port) qs.set('port', filters.port);
   qs.set('limit', '400');
 
   const res = await fetch(`${baseUrl}/api/v1/network?${qs.toString()}`, {
@@ -44,11 +47,28 @@ export const revalidate = 0;
 export default async function NetworkPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = searchParams ? await searchParams : undefined;
   const importId = typeof params?.importId === 'string' ? params.importId : '';
-  const data = await getNetwork(importId || undefined);
+  const subnet = typeof params?.subnet === 'string' ? params.subnet : '';
+  const service = typeof params?.service === 'string' ? params.service : '';
+  const port = typeof params?.port === 'string' ? params.port : '';
+
+  const data = await getNetwork({
+    importId: importId || undefined,
+    subnet: subnet || undefined,
+    service: service || undefined,
+    port: port || undefined
+  });
 
   const assets = data.nodes.filter((n) => n.type === 'asset');
   const portNodes = data.nodes.filter((n) => n.type === 'port');
   const serviceNodes = data.nodes.filter((n) => n.type === 'service');
+
+  const serviceLinkCounts = data.links
+    .filter((l) => l.target.startsWith('service:'))
+    .reduce<Record<string, number>>((acc, l) => {
+      const key = l.target.replace('service:', '');
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
 
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
@@ -58,8 +78,11 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
       <h1 style={{ marginBottom: 8 }}>Network Topology</h1>
       <p style={{ marginTop: 0 }}>Phase 5 Item 2: asset-to-port/service relationship view.</p>
 
-      <form method="get" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14 }}>
-        <input name="importId" placeholder="Filter import ID" defaultValue={importId} style={{ minWidth: 420 }} />
+      <form method="get" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+        <input name="importId" placeholder="Filter import ID" defaultValue={importId} style={{ minWidth: 320 }} />
+        <input name="subnet" placeholder="Subnet prefix (e.g. 10.0.0.)" defaultValue={subnet} style={{ minWidth: 220 }} />
+        <input name="service" placeholder="Service tag (e.g. ssh)" defaultValue={service} style={{ minWidth: 220 }} />
+        <input name="port" placeholder="Port (e.g. 22)" defaultValue={port} style={{ width: 120 }} />
         <button type="submit">Apply</button>
         <Link href="/network">Reset</Link>
       </form>
@@ -69,6 +92,28 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 130 }}><strong>Ports</strong><div>{portNodes.length}</div></div>
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 130 }}><strong>Services</strong><div>{serviceNodes.length}</div></div>
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 130 }}><strong>Links</strong><div>{data.summary.links}</div></div>
+      </div>
+
+      <h2 style={{ marginBottom: 8 }}>Service groups</h2>
+      <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+        <table style={{ borderCollapse: 'collapse', minWidth: 560, width: '100%' }}>
+          <thead>
+            <tr>{['Service', 'Connected assets'].map((h) => <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {Object.keys(serviceLinkCounts).length === 0 ? (
+              <tr><td colSpan={2} style={{ padding: '12px 10px', color: '#666' }}>No service groups in current filter set.</td></tr>
+            ) : Object.entries(serviceLinkCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 50)
+                .map(([svc, count]) => (
+                  <tr key={svc}>
+                    <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{svc}</td>
+                    <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{count}</td>
+                  </tr>
+                ))}
+          </tbody>
+        </table>
       </div>
 
       <h2 style={{ marginBottom: 8 }}>Topology edges</h2>
