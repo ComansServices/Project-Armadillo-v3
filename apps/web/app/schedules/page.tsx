@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
+import { AppShell } from '../_components/app-shell';
 import { redirect } from 'next/navigation';
 
 type ScanSchedule = {
@@ -96,10 +97,12 @@ export default async function SchedulesPage({ searchParams }: { searchParams?: P
   const schedules = await getSchedules();
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
-      <p style={{ marginBottom: 12 }}><Link href="/">← Back to scans</Link></p>
-      <h1 style={{ marginBottom: 8 }}>Scan Schedules</h1>
-      <p style={{ marginTop: 0 }}>Phase 1 parity: create and toggle recurring scan schedules.</p>
+    <AppShell
+      title="Scan Schedules"
+      purpose="Automate recurring scan execution windows with visibility on run outcomes."
+      whenToUse="Use this page when setting routine scanning cadence for projects."
+      firstAction="Create a schedule, then monitor next run and latest run status columns."
+    >
       {saved ? <p style={{ color: '#0b7d29' }}>Schedule saved.</p> : null}
       {ran ? <p style={{ color: '#0b7d29' }}>Due schedules processed.</p> : null}
       {error ? <p style={{ color: '#a61b1b' }}>Save failed (HTTP {error}).</p> : null}
@@ -148,6 +151,6 @@ export default async function SchedulesPage({ searchParams }: { searchParams?: P
           </tbody>
         </table>
       </div>
-    </main>
+    </AppShell>
   );
 }

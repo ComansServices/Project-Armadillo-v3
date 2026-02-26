@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AppShell } from '../_components/app-shell';
 
 type Summary = {
   totals: { assets: number; imports: number; scans: number; vulnsWindow: number };
@@ -93,11 +94,12 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const data = await getSummary(safeDays, importId || undefined);
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
-      <p style={{ marginBottom: 12 }}><Link href="/">← Back to scans</Link></p>
-      <h1 style={{ marginBottom: 8 }}>Dashboard parity</h1>
-      <p style={{ marginTop: 0 }}>Item 3: stats + charts + export snapshot.</p>
-
+    <AppShell
+      title="Dashboard"
+      purpose="Monitor high-level security and scan trends at a glance."
+      whenToUse="Use this page when you need rapid KPI context before deep triage."
+      firstAction="Set your date window and optional import scope, then review severity and trend cards."
+    >
       <form method="get" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
         <label>Window days</label>
         <input name="days" defaultValue={String(safeDays)} style={{ width: 90 }} />
@@ -132,6 +134,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         <MiniBars title="Top ports" rows={data.topPorts} color="#0f766e" />
         <MiniBars title="Top OS" rows={data.topOs} color="#7c3aed" />
       </div>
-    </main>
+    </AppShell>
   );
 }

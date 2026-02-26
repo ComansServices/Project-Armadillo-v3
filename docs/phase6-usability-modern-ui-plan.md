@@ -2,7 +2,7 @@
 
 Date: 2026-02-26
 Owner: Comans / Leo
-Status: Planned (post-Phase 5 parity)
+Status: U1 delivered (foundations complete); U2 queued
 
 ## Objective
 Improve operator speed, comprehension, and confidence by modernizing page structure, action hierarchy, and helper guidance across desktop + mobile.
@@ -95,6 +95,12 @@ Grouping:
 - Report cards by audience (Ops / Exec)
 - One-click download/open-source context actions
 - Better context/helper text for report purpose
+
+## U1 Delivery Notes (completed)
+- Added shared app shell component with consistent top navigation across core pages.
+- Implemented button-first quick action bar on overview/import pages.
+- Added standard helper callout block (Purpose / When to use / Start here) across core UIs.
+- Applied foundation pattern to Overview, Dashboard, Imports, Assets, Vulnerabilities, Network, Schedules, and Reports.
 
 ## Delivery Phases
 

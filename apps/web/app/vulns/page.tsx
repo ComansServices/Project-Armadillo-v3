@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AppShell } from '../_components/app-shell';
 
 type Finding = {
   id: number;
@@ -89,11 +90,12 @@ export default async function VulnsPage({
   const groupOrder = Object.keys(grouped).sort((a, b) => (sevRank[b] ?? 0) - (sevRank[a] ?? 0));
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
-      <p style={{ marginBottom: 12 }}>
-        <Link href="/">← Back to scans</Link>
-      </p>
-      <h1 style={{ marginBottom: 8 }}>Vulnerability Findings</h1>
+    <AppShell
+      title="Vulnerability Findings"
+      purpose="Triage CVE risk by severity, exploit context, and affected assets."
+      whenToUse="Use this page when prioritising remediation or preparing stakeholder updates."
+      firstAction="Filter by import/severity, then review high and critical findings first."
+    >
       <p style={{ marginTop: 0 }}>CVE/CPE enrichment results from import assets. CSV export includes source and description fields for analyst handoff.</p>
 
       <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -196,6 +198,6 @@ export default async function VulnsPage({
           </div>
         </section>
       ))}
-    </main>
+    </AppShell>
   );
 }

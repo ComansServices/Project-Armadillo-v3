@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AppShell } from '../_components/app-shell';
 
 type AssetRecord = {
   id: string;
@@ -71,15 +72,12 @@ export default async function AssetsPage({
   const assets = await getAssets(filters);
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
-      <p style={{ marginBottom: 12 }}>
-        <Link href="/imports">← Back to imports</Link>
-      </p>
-      <p style={{ marginTop: 0 }}>
-        <Link href="/vulns">View vulnerability findings →</Link>
-      </p>
-      <h1 style={{ marginBottom: 8 }}>Normalized Assets</h1>
-      <p style={{ marginTop: 0 }}>Assets extracted from XML imports (manual refresh).</p>
+    <AppShell
+      title="Assets"
+      purpose="Inspect normalized host assets and pivot into vulnerability and network triage."
+      whenToUse="Use this page after imports to review discovered infrastructure quickly."
+      firstAction="Apply a filter (IP, hostname, tag), then open a target asset detail."
+    >
 
       <form method="get" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(4, minmax(0,1fr))' }}>
         <input name="ip" placeholder="Filter IP (e.g. 10.0.0)" defaultValue={filters.ip ?? ''} />
@@ -143,6 +141,6 @@ export default async function AssetsPage({
           </tbody>
         </table>
       </div>
-    </main>
+    </AppShell>
   );
 }

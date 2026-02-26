@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AppShell } from '../_components/app-shell';
 
 type ReportItem = {
   kind: 'import' | 'scan';
@@ -30,11 +31,12 @@ export default async function ReportsPage() {
   const reports = await getReports();
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
-      <p style={{ marginBottom: 12 }}>
-        <Link href="/">← Back to scans</Link>
-      </p>
-      <h1 style={{ marginBottom: 8 }}>Report Archive</h1>
+    <AppShell
+      title="Report Archive"
+      purpose="Access generated operational and executive PDFs for distribution."
+      whenToUse="Use this page after scan/import milestones when sharing formal outputs."
+      firstAction="Choose the latest report row and open PDF in a new tab."
+    >
       <p style={{ marginTop: 0 }}>Archived PDF reports generated with archive mode.</p>
 
       <div style={{ overflowX: 'auto', marginTop: 16 }}>
@@ -77,6 +79,6 @@ export default async function ReportsPage() {
           </tbody>
         </table>
       </div>
-    </main>
+    </AppShell>
   );
 }

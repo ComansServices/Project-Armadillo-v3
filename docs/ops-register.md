@@ -15,6 +15,7 @@ Owner: Comans / Leo
 4. Item 5 Exploit enrichment parity complete (UI + CSV + report surfacing)
 5. Item 6 Auth hardening complete (signed session path + scope + lockout/audit)
 6. Prod hardening pass complete in stack config (`AUTH_ALLOW_LEGACY_HEADERS=false`)
+7. Usability Phase U1 complete (shared app shell/nav, button-first actions, helper text framework across core pages)
 
 ## Operational Security Posture (current)
 - Signed session auth enabled for API
@@ -29,9 +30,9 @@ Owner: Comans / Leo
   - Action: phase after parity (provider integration + session UX)
 
 ## Next Actions (approved)
-1. Execute Usability + Modern UI Phase U1
-2. Build app shell/nav + button hierarchy + helper text framework
-3. Deliver first redesign checkpoint (Overview + Scans)
+1. Execute Usability + Modern UI Phase U2 (core workflow refinements)
+2. Redesign Scans + Imports + Assets interactions for faster triage
+3. Add mobile table/card fallbacks on core workflow pages
 4. Run breakpoint QA and present before/after pack
 
 ## Change Log (today)

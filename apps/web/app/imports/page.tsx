@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
+import { ActionButtons, AppShell } from '../_components/app-shell';
 import { redirect } from 'next/navigation';
 
 type XmlImportRecord = {
@@ -130,21 +131,18 @@ export default async function ImportsPage({
   const [imports, trend, policies] = await Promise.all([getImports(), getTrend(), getPolicies()]);
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
-      <p style={{ marginBottom: 12 }}>
-        <Link href="/">← Back to scans</Link>
-      </p>
-      <h1 style={{ marginBottom: 8 }}>XML Imports</h1>
-      <p style={{ marginTop: 0 }}>Latest imported XML payloads (manual refresh).</p>
-      <p style={{ marginTop: 0 }}>
-        <Link href="/assets">View normalized assets →</Link>
-      </p>
-      <p style={{ marginTop: 0 }}>
-        <a href={`${publicApiBaseUrl}/api/v1/imports.csv?limit=500`} target="_blank" rel="noreferrer">
-          Export imports CSV →
-        </a>
-      </p>
-
+    <AppShell
+      title="XML Imports"
+      purpose="Ingest and quality-check source XML payloads before downstream analysis."
+      whenToUse="Use this page when onboarding new scan data or checking source policy enforcement."
+      firstAction="Review the latest import quality, then open assets or run enrichment."
+    >
+      <ActionButtons
+        actions={[
+          { href: '/assets', label: 'Open Assets', primary: true },
+          { href: `${publicApiBaseUrl}/api/v1/imports.csv?limit=500`, label: 'Export CSV' }
+        ]}
+      />
 
       <h2 style={{ marginTop: 20, marginBottom: 8 }}>Import Source Policies</h2>
       {policySaved ? (
@@ -305,6 +303,6 @@ export default async function ImportsPage({
           </tbody>
         </table>
       </div>
-    </main>
+    </AppShell>
   );
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AppShell } from '../_components/app-shell';
 
 type NetworkNode = {
   id: string;
@@ -103,12 +104,12 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
   }, {} as Record<string, typeof assets>);
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
-      <p style={{ marginBottom: 12 }}>
-        <Link href="/">← Back to scans</Link>
-      </p>
-      <h1 style={{ marginBottom: 8 }}>Network Topology</h1>
-      <p style={{ marginTop: 0 }}>Phase 5 Item 2: asset-to-port/service relationship view.</p>
+    <AppShell
+      title="Network Topology"
+      purpose="Visualise host-to-service relationships for rapid network understanding and triage."
+      whenToUse="Use this page when investigating exposure paths, service clusters, or subnet grouping."
+      firstAction="Pick layout mode, apply a filter, then select a node to inspect in the entity panel."
+    >
 
       <form method="get" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
         <input type="hidden" name="layout" value={layout} />
@@ -300,6 +301,6 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
           </tbody>
         </table>
       </div>
-    </main>
+    </AppShell>
   );
 }

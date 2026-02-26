@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ActionButtons, AppShell } from './_components/app-shell';
 
 type ScanRecord = {
   id: string;
@@ -39,31 +40,21 @@ export default async function HomePage() {
   const scans = await getScans();
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
-      <h1 style={{ marginBottom: 8 }}>Armadillo v3</h1>
-      <p style={{ marginTop: 0 }}>Live scan queue/status view (manual refresh).</p>
-      <p style={{ marginTop: 0 }}>
-        <Link href="/imports">View XML imports →</Link>
-      </p>
-      <p style={{ marginTop: 0 }}>
-        <Link href="/assets">View normalized assets →</Link>
-      </p>
-      <p style={{ marginTop: 0 }}>
-        <Link href="/vulns">View vulnerability findings →</Link>
-      </p>
-      <p style={{ marginTop: 0 }}>
-        <Link href="/reports">View report archive →</Link>
-      </p>
-      <p style={{ marginTop: 0 }}>
-        <Link href="/schedules">Manage scan schedules →</Link>
-      </p>
-      <p style={{ marginTop: 0 }}>
-        <Link href="/network">View network topology →</Link>
-      </p>
-      <p style={{ marginTop: 0 }}>
-        <Link href="/dashboard">View stats dashboard →</Link>
-      </p>
-
+    <AppShell
+      title="Armadillo v3 Overview"
+      purpose="Track scan activity and jump quickly into operational workflows."
+      whenToUse="Use this as your command centre before moving into imports, vulnerabilities, or reports."
+      firstAction="Review the latest scan statuses, then use a quick action button."
+    >
+      <ActionButtons
+        actions={[
+          { href: '/imports', label: 'Open Imports', primary: true },
+          { href: '/assets', label: 'Open Assets' },
+          { href: '/vulns', label: 'Open Vulnerabilities' },
+          { href: '/reports', label: 'Open Reports' },
+          { href: '/schedules', label: 'Open Schedules' }
+        ]}
+      />
 
       <div style={{ overflowX: 'auto', marginTop: 16 }}>
         <table style={{ borderCollapse: 'collapse', minWidth: 900, width: '100%' }}>
@@ -109,6 +100,6 @@ export default async function HomePage() {
           </tbody>
         </table>
       </div>
-    </main>
+    </AppShell>
   );
 }
