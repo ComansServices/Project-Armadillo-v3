@@ -10,6 +10,10 @@ type ScanSchedule = {
   timezone: string;
   projectId: string;
   requestedBy: string;
+  nextRunAt: string | null;
+  lastRunAt: string | null;
+  lastRunStatus: string | null;
+  lastRunMessage: string | null;
   createdAt: string;
 };
 
@@ -61,12 +65,23 @@ async function toggleScheduleAction(formData: FormData) {
   redirect('/schedules');
 }
 
+async function runDueAction() {
+  'use server';
+  await fetch(`${baseUrl}/api/v1/scan-schedules/run-due`, {
+    method: 'POST',
+    headers: authHeaders
+  });
+  revalidatePath('/schedules');
+  redirect('/schedules?ran=1');
+}
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function SchedulesPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = searchParams ? await searchParams : undefined;
   const saved = params?.saved === '1';
+  const ran = params?.ran === '1';
   const error = typeof params?.error === 'string' ? params.error : null;
   const schedules = await getSchedules();
 
@@ -76,9 +91,10 @@ export default async function SchedulesPage({ searchParams }: { searchParams?: P
       <h1 style={{ marginBottom: 8 }}>Scan Schedules</h1>
       <p style={{ marginTop: 0 }}>Phase 1 parity: create and toggle recurring scan schedules.</p>
       {saved ? <p style={{ color: '#0b7d29' }}>Schedule saved.</p> : null}
+      {ran ? <p style={{ color: '#0b7d29' }}>Due schedules processed.</p> : null}
       {error ? <p style={{ color: '#a61b1b' }}>Save failed (HTTP {error}).</p> : null}
 
-      <form action={createScheduleAction} style={{ display: 'grid', gap: 8, maxWidth: 720, marginBottom: 20 }}>
+      <form action={createScheduleAction} style={{ display: 'grid', gap: 8, maxWidth: 720, marginBottom: 12 }}>
         <input name="name" placeholder="Schedule name" required />
         <input name="cronExpr" placeholder="Cron expr (e.g. 0 2 * * *)" required />
         <input name="timezone" defaultValue="Australia/Melbourne" required />
@@ -87,15 +103,18 @@ export default async function SchedulesPage({ searchParams }: { searchParams?: P
         <input name="target" defaultValue="127.0.0.1" required />
         <button type="submit">Create schedule</button>
       </form>
+      <form action={runDueAction} style={{ marginBottom: 20 }}>
+        <button type="submit">Run due schedules now</button>
+      </form>
 
       <div style={{ overflowX: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', minWidth: 900, width: '100%' }}>
           <thead>
-            <tr>{['Name', 'Cron', 'TZ', 'Project', 'RequestedBy', 'Enabled', 'Action'].map((h) => <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>{h}</th>)}</tr>
+            <tr>{['Name', 'Cron', 'TZ', 'Project', 'RequestedBy', 'Next Run', 'Last Run', 'Last Status', 'Enabled', 'Action'].map((h) => <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>{h}</th>)}</tr>
           </thead>
           <tbody>
             {schedules.length === 0 ? (
-              <tr><td colSpan={7} style={{ padding: '12px 10px', color: '#666' }}>No schedules yet.</td></tr>
+              <tr><td colSpan={10} style={{ padding: '12px 10px', color: '#666' }}>No schedules yet.</td></tr>
             ) : schedules.map((s) => (
               <tr key={s.id}>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.name}</td>
@@ -103,6 +122,9 @@ export default async function SchedulesPage({ searchParams }: { searchParams?: P
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.timezone}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.projectId}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.requestedBy}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : '-'}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : '-'}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }} title={s.lastRunMessage ?? ''}>{s.lastRunStatus ?? '-'}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{s.enabled ? 'yes' : 'no'}</td>
                 <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
                   <form action={toggleScheduleAction}>

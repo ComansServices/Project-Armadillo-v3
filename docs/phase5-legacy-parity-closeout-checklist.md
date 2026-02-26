@@ -5,12 +5,12 @@ Goal: close remaining legacy-era feature gaps in a controlled, one-by-one sequen
 ## Work order (do in sequence)
 
 ### 1) Scan scheduling UI parity
-- [x] Add scan schedule model (recurring + one-off) *(Phase 1 foundation landed)*
-- [x] Add UI to create/edit/disable schedules *(create + toggle landed)*
-- [ ] Show next-run + last-run status in UI
-- [ ] Wire schedule execution to existing queue pipeline
+- [x] Add scan schedule model (recurring + one-off)
+- [x] Add UI to create/edit/disable schedules
+- [x] Show next-run + last-run status in UI
+- [x] Wire schedule execution to existing queue pipeline *(due-run processor + auto 60s poller)*
 - [x] Add RBAC constraints (viewer read-only; staff/admin manage)
-- [ ] Acceptance: user can schedule scans from UI and see execution lifecycle
+- [x] Acceptance: user can schedule scans from UI and see execution lifecycle
 
 ### 2) Network view / topology page
 - [ ] Define network graph data endpoint (nodes, links, metadata)

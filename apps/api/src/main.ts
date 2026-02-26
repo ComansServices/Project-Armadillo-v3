@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
+import { CronExpressionParser } from 'cron-parser';
 import { scanQueue } from './queue';
 import { createScan, getScan, listScans, listScanEvents } from './store';
 import { createXmlImport, getImportQualityDigest, getXmlImport, listImportQualityTrend, listXmlImports } from './imports';
@@ -93,6 +94,72 @@ async function archiveReport(params: {
   );
 
   return { pdfName, metaName };
+}
+
+function nextRunFromCron(cronExpr: string, timezone: string) {
+  try {
+    const interval = CronExpressionParser.parse(cronExpr, { tz: timezone });
+    return interval.next().toDate();
+  } catch {
+    return null;
+  }
+}
+
+let scheduleRunnerBusy = false;
+async function runDueSchedules() {
+  if (scheduleRunnerBusy) return { ran: 0 };
+  scheduleRunnerBusy = true;
+  try {
+    const now = new Date();
+    const due = await prisma.scanSchedule.findMany({ where: { enabled: true, nextRunAt: { lte: now } }, take: 20 });
+    let ran = 0;
+
+    for (const s of due) {
+      const scanId = randomUUID();
+      const request = {
+        projectId: s.projectId,
+        requestedBy: s.requestedBy,
+        targets: (s.targets as Array<{ type: string; value: string }>) ?? [],
+        config: (s.config as Record<string, unknown>) ?? { profile: 'safe-default' }
+      };
+
+      try {
+        await createScan({ id: scanId, projectId: s.projectId, requestedBy: s.requestedBy, status: 'queued', request });
+        await scanQueue.add('scan-stage', { scanId, stage: 'naabu', request } as ScanJobPayload, {
+          attempts: 2,
+          removeOnComplete: 100,
+          removeOnFail: 100
+        });
+
+        await prisma.scanSchedule.update({
+          where: { id: s.id },
+          data: {
+            lastRunAt: now,
+            lastRunScanId: scanId,
+            lastRunStatus: 'queued',
+            lastRunMessage: 'Scheduled run queued',
+            nextRunAt: nextRunFromCron(s.cronExpr, s.timezone)
+          }
+        });
+        ran += 1;
+      } catch (err) {
+        const e = err as Error;
+        await prisma.scanSchedule.update({
+          where: { id: s.id },
+          data: {
+            lastRunAt: now,
+            lastRunStatus: 'failed',
+            lastRunMessage: e.message.slice(0, 240),
+            nextRunAt: nextRunFromCron(s.cronExpr, s.timezone)
+          }
+        });
+      }
+    }
+
+    return { ran };
+  } finally {
+    scheduleRunnerBusy = false;
+  }
 }
 
 app.get('/health', async () => ({ ok: true, service: 'armadillo-api' }));
@@ -201,18 +268,20 @@ app.post('/api/v1/scan-schedules', async (req, reply) => {
     return reply.code(400).send({ error: 'invalid_schedule_payload' });
   }
 
+  const timezone = (body.timezone || 'Australia/Melbourne').trim();
+  const cronExpr = body.cronExpr.trim();
   const created = await prisma.scanSchedule.create({
     data: {
       id: randomUUID(),
       name: body.name.trim(),
       enabled: true,
-      cronExpr: body.cronExpr.trim(),
-      timezone: (body.timezone || 'Australia/Melbourne').trim(),
+      cronExpr,
+      timezone,
       projectId: body.projectId.trim(),
       requestedBy: body.requestedBy.trim(),
       targets: body.targets,
       config: body.config ?? {},
-      nextRunAt: null,
+      nextRunAt: nextRunFromCron(cronExpr, timezone),
       lastRunAt: null
     }
   });
@@ -228,8 +297,22 @@ app.post('/api/v1/scan-schedules/:scheduleId/toggle', async (req, reply) => {
   const row = await prisma.scanSchedule.findUnique({ where: { id: scheduleId } });
   if (!row) return reply.code(404).send({ error: 'Schedule not found' });
 
-  const updated = await prisma.scanSchedule.update({ where: { id: scheduleId }, data: { enabled: !row.enabled } });
+  const nextEnabled = !row.enabled;
+  const updated = await prisma.scanSchedule.update({
+    where: { id: scheduleId },
+    data: {
+      enabled: nextEnabled,
+      nextRunAt: nextEnabled ? nextRunFromCron(row.cronExpr, row.timezone) : null
+    }
+  });
   return updated;
+});
+
+app.post('/api/v1/scan-schedules/run-due', async (req, reply) => {
+  const actor = requireRole(req, reply, 'staff');
+  if (!actor) return;
+  const result = await runDueSchedules();
+  return result;
 });
 
 app.post('/api/v1/imports/xml', async (req, reply) => {
@@ -993,4 +1076,8 @@ app.get('/api/v1/reports/scans/:scanId.pdf', async (req, reply) => {
 
 app.listen({ host: '0.0.0.0', port: 4000 }).then(() => {
   console.log('API listening on http://localhost:4000');
+  runDueSchedules().catch(() => {});
+  setInterval(() => {
+    runDueSchedules().catch(() => {});
+  }, 60_000);
 });

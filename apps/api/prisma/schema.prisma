@@ -24,10 +24,13 @@ model ScanSchedule {
   requestedBy String
   targets     Json
   config      Json?
-  nextRunAt   DateTime?
-  lastRunAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  lastRunScanId  String?
+  lastRunStatus  String?
+  lastRunMessage String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([enabled, nextRunAt])
   @@index([projectId, createdAt])
