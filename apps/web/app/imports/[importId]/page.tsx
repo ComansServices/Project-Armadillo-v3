@@ -121,7 +121,10 @@ export default async function ImportDetailPage({
   );
 
   const [data, importOptions] = await Promise.all([getImport(params.importId), getRecentImports()]);
-  const diff = againstImportId ? await getImportDiff(params.importId, againstImportId) : null;
+  const baselineOptions = importOptions.filter((opt) => opt.id !== data.id);
+  const latestBaseline = baselineOptions[0]?.id;
+  const effectiveAgainstImportId = againstImportId || latestBaseline || '';
+  const diff = effectiveAgainstImportId ? await getImportDiff(params.importId, effectiveAgainstImportId) : null;
   const labels = (data.annotations?.labels ?? []).join(', ');
   const notes = data.annotations?.notes ?? '';
 
@@ -161,21 +164,20 @@ export default async function ImportDetailPage({
 
       <h2 style={{ marginBottom: 8 }}>Import Diff</h2>
       <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select name="againstImportId" defaultValue={againstImportId} style={{ minWidth: 520 }}>
+        <select name="againstImportId" defaultValue={effectiveAgainstImportId} style={{ minWidth: 520 }}>
           <option value="">Select baseline import…</option>
-          {importOptions
-            .filter((opt) => opt.id !== data.id)
-            .map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {new Date(opt.createdAt).toLocaleString()} · {opt.source ?? '-'} · {opt.requestedBy} · {opt.id}
-              </option>
-            ))}
+          {baselineOptions.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {new Date(opt.createdAt).toLocaleString()} · {opt.source ?? '-'} · {opt.requestedBy} · {opt.id}
+            </option>
+          ))}
         </select>
         <button type="submit">Compare</button>
-        {againstImportId ? (
+        {latestBaseline ? <a href={`/imports/${data.id}?againstImportId=${latestBaseline}`}>Compare latest previous</a> : null}
+        {effectiveAgainstImportId ? (
           <>
-            <a href={`${publicApiBaseUrl}/api/v1/imports/${data.id}/diff?againstImportId=${againstImportId}`}>Export JSON</a>
-            <a href={`${publicApiBaseUrl}/api/v1/imports/${data.id}/diff?againstImportId=${againstImportId}&format=csv`}>Export CSV</a>
+            <a href={`${publicApiBaseUrl}/api/v1/imports/${data.id}/diff?againstImportId=${effectiveAgainstImportId}`}>Export JSON</a>
+            <a href={`${publicApiBaseUrl}/api/v1/imports/${data.id}/diff?againstImportId=${effectiveAgainstImportId}&format=csv`}>Export CSV</a>
           </>
         ) : null}
       </form>

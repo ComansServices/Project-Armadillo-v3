@@ -80,12 +80,15 @@ export default async function ScanDetailPage({
   const qp = searchParams ? await searchParams : undefined;
   const againstScanId = typeof qp?.againstScanId === 'string' ? qp.againstScanId : '';
 
-  const [scan, events, scanOptions, diff] = await Promise.all([
+  const [scan, events, scanOptions] = await Promise.all([
     getScan(params.scanId),
     getEvents(params.scanId),
-    getRecentScans(),
-    againstScanId ? getScanDiff(params.scanId, againstScanId) : Promise.resolve(null)
+    getRecentScans()
   ]);
+  const baselineOptions = scanOptions.filter((opt) => opt.id !== params.scanId);
+  const latestBaseline = baselineOptions[0]?.id;
+  const effectiveAgainstScanId = againstScanId || latestBaseline || '';
+  const diff = effectiveAgainstScanId ? await getScanDiff(params.scanId, effectiveAgainstScanId) : null;
 
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
@@ -106,21 +109,20 @@ export default async function ScanDetailPage({
 
       <h2 style={{ marginBottom: 8 }}>Scan Diff</h2>
       <form method="get" style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select name="againstScanId" defaultValue={againstScanId} style={{ minWidth: 520 }}>
+        <select name="againstScanId" defaultValue={effectiveAgainstScanId} style={{ minWidth: 520 }}>
           <option value="">Select baseline scan…</option>
-          {scanOptions
-            .filter((opt) => opt.id !== scan.id)
-            .map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {new Date(opt.createdAt).toLocaleString()} · {opt.projectId} · {opt.requestedBy} · {opt.id}
-              </option>
-            ))}
+          {baselineOptions.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {new Date(opt.createdAt).toLocaleString()} · {opt.projectId} · {opt.requestedBy} · {opt.id}
+            </option>
+          ))}
         </select>
         <button type="submit">Compare</button>
-        {againstScanId ? (
+        {latestBaseline ? <a href={`/scans/${scan.id}?againstScanId=${latestBaseline}`}>Compare latest previous</a> : null}
+        {effectiveAgainstScanId ? (
           <>
-            <a href={`${publicApiBaseUrl}/api/v1/scans/${scan.id}/diff?againstScanId=${againstScanId}`}>Export JSON</a>
-            <a href={`${publicApiBaseUrl}/api/v1/scans/${scan.id}/diff?againstScanId=${againstScanId}&format=csv`}>Export CSV</a>
+            <a href={`${publicApiBaseUrl}/api/v1/scans/${scan.id}/diff?againstScanId=${effectiveAgainstScanId}`}>Export JSON</a>
+            <a href={`${publicApiBaseUrl}/api/v1/scans/${scan.id}/diff?againstScanId=${effectiveAgainstScanId}&format=csv`}>Export CSV</a>
           </>
         ) : null}
       </form>
