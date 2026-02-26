@@ -74,11 +74,17 @@ export function buildBrandedReportPdf(options: {
   let y = 800;
   const chunks: string[] = ['BT'];
 
-  // Header block
-  chunks.push('/F1 20 Tf');
-  chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText('Comans Services • Armadillo')}) Tj`);
+  // Header block using Comans site palette
+  // primary red: #b92128  => 0.725 0.129 0.157
+  // slate: #3d4e5c        => 0.239 0.306 0.361
+  chunks.push('0.725 0.129 0.157 rg');
+  chunks.push('/F1 24 Tf');
+  chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText('COMANS')}) Tj`);
+  chunks.push('/F1 10 Tf');
+  chunks.push(`1 0 0 1 136 ${y + 2} Tm (${escapePdfText('SERVICES')}) Tj`);
   y -= 28;
 
+  chunks.push('0.239 0.306 0.361 rg');
   chunks.push('/F1 16 Tf');
   chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText(options.title)}) Tj`);
   y -= 20;
@@ -88,15 +94,20 @@ export function buildBrandedReportPdf(options: {
   chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText(subtitle)}) Tj`);
   y -= 16;
   chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText(`Generated ${generatedAt}`)}) Tj`);
-  y -= 22;
+  y -= 14;
+  chunks.push('/F1 9 Tf');
+  chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText('Brand source: comansservices.com.au • logo: /images/comansservices-logo-w.svg')}) Tj`);
+  y -= 16;
 
   for (const section of options.sections.slice(0, 12)) {
     if (y < 80) break;
 
+    chunks.push('0.725 0.129 0.157 rg');
     chunks.push('/F1 13 Tf');
     chunks.push(`1 0 0 1 40 ${y} Tm (${escapePdfText(section.heading)}) Tj`);
     y -= 16;
 
+    chunks.push('0.239 0.306 0.361 rg');
     chunks.push('/F1 11 Tf');
     for (const line of section.lines.slice(0, 60)) {
       const wrapped = wrapLine(line, 92);
