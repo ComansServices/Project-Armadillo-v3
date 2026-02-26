@@ -40,6 +40,161 @@ Modern, queue-driven network discovery and security visibility platform.
 
 ---
 
+## 🖼️ Visual Tour
+
+Here's what Armadillo looks like in action — screenshots from the running application:
+
+### 1. Overview — Command Centre
+![Overview](docs/assets/screenshots/01-overview.png)
+
+**Purpose:** Your security operations starting point. Track scan activity across all projects, see status counts at a glance, and jump quickly into operational workflows.
+
+**Key Features:**
+- **Status counters** — Queued, Running, Completed, Failed scan counts
+- **Quick actions** — One-click access to Imports, Assets, Vulnerabilities, Reports, Schedules
+- **Scan history table** — Filter by status, paginate through results, drill into individual scans
+- **Mobile-responsive cards** — Same functionality, optimized for field access on phones/tablets
+
+---
+
+### 2. Vulnerabilities — Prioritised Action
+![Vulnerabilities](docs/assets/screenshots/02-vulnerabilities.png)
+
+**Purpose:** Stop drowning in CVE lists. Armadillo prioritises vulnerabilities by exploitability and business impact so you fix what matters first.
+
+**Key Features:**
+- **🔥 Exploitability-first grouping** — Split view between "Has Public Exploit" vs "📋 Theoretical Risk"
+- **Blast radius chips** — See "affects 12 hosts" directly in the list without clicking through
+- **Remediation tracking** — Assign tickets to staff, set due dates, track status (open/in_progress/resolved)
+- **Inline editing** — Update assignee, status, and due date without leaving the page
+- **CSV export** — Full vulnerability list with remediation fields for executive reporting
+
+---
+
+### 3. Assets — Change Awareness
+![Assets](docs/assets/screenshots/03-assets.png)
+
+**Purpose:** Know what you have, what's new, and what's changed. Asset inventory with intelligence, not just a spreadsheet.
+
+**Key Features:**
+- **Change badges** — "New today", "New this week", or "Changed" indicators on every asset
+- **Delta tracking** — See port/service changes since last scan (+3 ports, -1 service)
+- **Risk heatmap** — Aggregate vulnerability score per asset (critical count × exposure)
+- **Global search** — Cmd+K to jump to any asset by IP, hostname, or scan ID
+- **Filter & export** — Slice by project, status, or risk level; export for compliance reports
+
+---
+
+### 4. Network — Attack Path Visualisation
+![Network](docs/assets/screenshots/04-network.png)
+
+**Purpose:** Understand your attack surface visually. See topology, simulate lateral movement, and identify critical choke points.
+
+**Key Features:**
+- **Interactive topology** — Visual network graph with zoom, pan, and node selection
+- **Attack path simulation** — "If entry point is X, can an attacker reach Y?" with vulnerability context per hop
+- **Exposure scoring** — Internet-facing assets with critical vulnerabilities auto-surface
+- **Service dependency mapping** — Web tier → DB tier → Backend logical groupings
+- **Lateral movement detection** — Visualise how an attacker could pivot through your network
+
+---
+
+### 5. Imports — Quality Pipeline
+![Imports](docs/assets/screenshots/05-imports.png)
+
+**Purpose:** Ingest scan data from any source with confidence. Strict quality controls ensure garbage data doesn't pollute your security decisions.
+
+**Key Features:**
+- **XML import pipeline** — Upload Nessus/OpenVAS scans with strict or lenient quality modes
+- **Quality analytics** — Success rate, skip reasons, invalid entries tracked over time
+- **Reject artifacts** — Download rejected records for fixing and re-import
+- **Source policy governance** — Enforce which import sources are trusted
+- **CSV exports** — Full import history with quality metrics for auditing
+
+---
+
+### 6. Schedules — Automated Coverage
+![Schedules](docs/assets/screenshots/06-schedules.png)
+
+**Purpose:** Set it and forget it. Schedule recurring scans with conflict detection to ensure continuous coverage without overwhelming your network.
+
+**Key Features:**
+- **Cron expression support** — Flexible scheduling (daily, weekly, monthly, custom)
+- **Conflict warnings** — Alert if two schedules hit the same CIDR at the same time
+- **Pause with reason** — "Paused: Customer maintenance window" annotations
+- **Auto-queue digests** — Summary emails when scheduled scans complete
+- **Project-scoped** — Schedules respect project boundaries for multi-tenant MSP use
+
+---
+
+### 7. Reports — Distribution Ready
+![Reports](docs/assets/screenshots/07-reports.png)
+
+**Purpose:** Close the loop with stakeholders. Generate executive summaries, technical details, and compliance documentation automatically.
+
+**Key Features:**
+- **PDF exports** — One-click PDF generation for imports, scans, and vulnerability lists
+- **Report automation** — Scheduled reports with archive and digest
+- **Delivery tracking** — "Sent/Pending/Acknowledged" workflow for client reports
+- **Failure alerting** — Auto-Teams notification if report generation fails
+- **Multi-format** — PDF, CSV, and raw data exports for different audiences
+
+---
+
+## 💡 Why We Built Armadillo
+
+### The Problem
+
+Most security tools fall into two camps:
+
+1. **Enterprise SIEMs** — Powerful but complex, expensive, and require dedicated teams to operate
+2. **Open-source scanners** — Free but fragmented, requiring manual stitching of outputs and tribal knowledge
+
+**Small-to-mid MSPs (10-50 employees) are underserved.** They need:
+- Visibility into client networks without 6-figure tooling costs
+- Prioritisation that actually helps them decide what to fix first
+- Workflows that junior staff can run without senior oversight
+- Reporting that proves value to clients without manual PowerPoint assembly
+
+### The Solution
+
+Armadillo bridges the gap between "we run Nessus occasionally" and "we have a SOC." It provides:
+
+| Capability | Business Value |
+|------------|----------------|
+| **Exploitability-first prioritisation** | Fix 20% of vulns that prevent 80% of breaches |
+| **Attack path simulation** | Understand actual risk, not just theoretical CVSS scores |
+| **Remediation tracking** | Hold staff accountable, measure time-to-fix, demonstrate improvement |
+| **Automated reporting** | Reduce report assembly from 4 hours to 10 minutes |
+| **Change awareness** | Spot new assets and drift before they become shadow IT |
+| **Quality-controlled imports** | Trust your data — bad imports don't pollute your security decisions |
+
+### Who It's For
+
+- **MSP owners** who want to offer "security as a service" without hiring a dedicated security team
+- **IT managers** who need to prove security posture to auditors and boards
+- **Security analysts** who are tired of spreadsheet-driven vulnerability management
+- **Compliance officers** who need evidence of continuous monitoring and timely remediation
+
+### Competitive Differentiation
+
+| Feature | Armadillo | Generic Scanner | Enterprise SIEM |
+|---------|-----------|-----------------|-----------------|
+| Deploy time | 5 minutes (Docker) | Hours of config | Weeks of professional services |
+| Exploitability focus | ✅ Built-in | ❌ Manual research | ✅ Available (expensive add-on) |
+| Attack path simulation | ✅ Included | ❌ Not available | ✅ Available (separate module) |
+| Remediation workflow | ✅ Native | ❌ External ticketing required | ⚠️ Complex integration |
+| Multi-tenant MSP mode | ✅ Designed for it | ❌ Single org only | ⚠️ Expensive licensing |
+| Cost | Free (self-hosted) + support | Free to $5K/year | $50K-$500K/year |
+
+### The Bottom Line
+
+Armadillo turns security scanning from a "checkbox compliance activity" into a **continuous, actionable, measurable security program**.
+
+It won't replace a dedicated security team for a Fortune 500. But for the thousands of MSPs and mid-market companies who need *good enough* security visibility without *enterprise* complexity, it's the Goldilocks solution.
+
+---
+
 ## 🗺️ Future Roadmap
 
 ### Phase 7 Sprint 3 — Operator Usability (Planned)

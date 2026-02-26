@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ActionButtons, AppShell } from './_components/app-shell';
+import { AttentionBanner } from './_components/attention-banner';
 
 type ScanRecord = {
   id: string;
@@ -60,6 +61,7 @@ export default async function HomePage({
       whenToUse="Use this as your command centre before moving into imports, vulnerabilities, or reports."
       firstAction="Use a status filter, then open a scan or jump via quick actions."
     >
+      <AttentionBanner />
       <ActionButtons
         actions={[
           { href: '/imports', label: 'Open Imports', primary: true },
