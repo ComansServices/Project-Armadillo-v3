@@ -175,6 +175,63 @@ app.get('/api/v1/scans/:scanId/events', async (req, reply) => {
   return { events };
 });
 
+app.get('/api/v1/scan-schedules', async (req, reply) => {
+  const actor = requireRole(req, reply, 'viewer');
+  if (!actor) return;
+
+  const rows = await prisma.scanSchedule.findMany({ orderBy: { createdAt: 'desc' }, take: 200 });
+  return { schedules: rows };
+});
+
+app.post('/api/v1/scan-schedules', async (req, reply) => {
+  const actor = requireRole(req, reply, 'staff');
+  if (!actor) return;
+
+  const body = req.body as {
+    name?: string;
+    cronExpr?: string;
+    timezone?: string;
+    projectId?: string;
+    requestedBy?: string;
+    targets?: Array<{ type: string; value: string }>;
+    config?: Record<string, unknown>;
+  };
+
+  if (!body?.name || !body?.cronExpr || !body?.projectId || !body?.requestedBy || !Array.isArray(body?.targets) || body.targets.length === 0) {
+    return reply.code(400).send({ error: 'invalid_schedule_payload' });
+  }
+
+  const created = await prisma.scanSchedule.create({
+    data: {
+      id: randomUUID(),
+      name: body.name.trim(),
+      enabled: true,
+      cronExpr: body.cronExpr.trim(),
+      timezone: (body.timezone || 'Australia/Melbourne').trim(),
+      projectId: body.projectId.trim(),
+      requestedBy: body.requestedBy.trim(),
+      targets: body.targets,
+      config: body.config ?? {},
+      nextRunAt: null,
+      lastRunAt: null
+    }
+  });
+
+  return created;
+});
+
+app.post('/api/v1/scan-schedules/:scheduleId/toggle', async (req, reply) => {
+  const actor = requireRole(req, reply, 'staff');
+  if (!actor) return;
+  const { scheduleId } = req.params as { scheduleId: string };
+
+  const row = await prisma.scanSchedule.findUnique({ where: { id: scheduleId } });
+  if (!row) return reply.code(404).send({ error: 'Schedule not found' });
+
+  const updated = await prisma.scanSchedule.update({ where: { id: scheduleId }, data: { enabled: !row.enabled } });
+  return updated;
+});
+
 app.post('/api/v1/imports/xml', async (req, reply) => {
   const actor = requireRole(req, reply, 'staff');
   if (!actor) return;

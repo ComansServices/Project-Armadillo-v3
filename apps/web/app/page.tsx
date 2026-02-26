@@ -53,6 +53,9 @@ export default async function HomePage() {
       <p style={{ marginTop: 0 }}>
         <Link href="/reports">View report archive →</Link>
       </p>
+      <p style={{ marginTop: 0 }}>
+        <Link href="/schedules">Manage scan schedules →</Link>
+      </p>
 
       <meta httpEquiv="refresh" content="5" />
 

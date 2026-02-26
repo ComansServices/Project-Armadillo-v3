@@ -14,6 +14,26 @@ enum ScanStatus {
   failed
 }
 
+model ScanSchedule {
+  id          String   @id
+  name        String
+  enabled     Boolean  @default(true)
+  cronExpr    String
+  timezone    String   @default("Australia/Melbourne")
+  projectId   String
+  requestedBy String
+  targets     Json
+  config      Json?
+  nextRunAt   DateTime?
+  lastRunAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([enabled, nextRunAt])
+  @@index([projectId, createdAt])
+  @@map("scan_schedules")
+}
+
 model Scan {
   id          String      @id
   projectId   String
