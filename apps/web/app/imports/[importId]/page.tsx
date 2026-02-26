@@ -1,6 +1,7 @@
 import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { AppShell } from '../../_components/app-shell';
 
 type ImportOption = { id: string; createdAt: string; source: string | null; requestedBy: string };
 
@@ -151,11 +152,15 @@ export default async function ImportDetailPage({
   const notes = data.annotations?.notes ?? '';
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
+    <AppShell
+      title="Import Detail"
+      purpose="Inspect a single import deeply, annotate findings, and compare against a baseline import."
+      whenToUse="Use this page after a completed import when validating quality or enrichment outcomes."
+      firstAction="Review quality summary and diff first, then annotate or run enrichment as needed."
+    >
       <p style={{ marginBottom: 12 }}>
         <Link href="/imports">← Back to imports</Link>
       </p>
-      <h1 style={{ marginBottom: 6 }}>Import Detail</h1>
       <p style={{ marginTop: 0, color: '#444' }}>{data.id}</p>
 
       <div style={{ marginTop: 12, marginBottom: 20 }}>
@@ -311,6 +316,6 @@ export default async function ImportDetailPage({
       >
         {JSON.stringify(data.payload, null, 2)}
       </pre>
-    </main>
+    </AppShell>
   );
 }

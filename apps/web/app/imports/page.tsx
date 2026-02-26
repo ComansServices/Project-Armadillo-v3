@@ -212,7 +212,7 @@ export default async function ImportsPage({
             align-items: stretch !important;
           }
 
-          .policy-row input[name='source'] {
+          .policy-row input[name=source] {
             grid-column: 1 / -1;
           }
 

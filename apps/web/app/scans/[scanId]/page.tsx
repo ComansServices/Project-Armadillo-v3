@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AppShell } from '../../_components/app-shell';
 
 type ScanOption = {
   id: string;
@@ -92,11 +93,15 @@ export default async function ScanDetailPage({
   const diff = effectiveAgainstScanId ? await getScanDiff(params.scanId, effectiveAgainstScanId) : null;
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
+    <AppShell
+      title="Scan Detail"
+      purpose="Review stage-by-stage scan execution and compare outcomes against another run."
+      whenToUse="Use this page when diagnosing run quality or preparing run-level reporting."
+      firstAction="Check status and timeline first, then use diff compare if behaviour changed."
+    >
       <p style={{ marginBottom: 12 }}>
         <Link href="/">← Back to scans</Link>
       </p>
-      <h1 style={{ marginBottom: 6 }}>Scan Detail</h1>
       <p style={{ marginTop: 0, color: '#444' }}>{scan.id}</p>
       <p style={{ marginTop: 0 }}>
         <Link href="/imports">View XML imports →</Link>
@@ -166,7 +171,7 @@ export default async function ScanDetailPage({
       ) : null}
 
       <h2 style={{ marginBottom: 8 }}>Timeline</h2>
-      <div style={{ overflowX: 'auto' }}>
+      <div className="desktop-table" style={{ overflowX: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', minWidth: 900, width: '100%' }}>
           <thead>
             <tr>
@@ -199,6 +204,23 @@ export default async function ScanDetailPage({
           </tbody>
         </table>
       </div>
-    </main>
+
+      <div className="mobile-cards" style={{ display: 'none', gap: 8 }}>
+        {events.length === 0 ? <p style={{ color: '#666' }}>No events yet.</p> : events.map((e) => (
+          <article key={`m-${e.id}`} style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, background: '#fff' }}>
+            <p style={{ margin: '0 0 4px 0' }}><strong>{e.stage ?? '-'}</strong> · {e.status ?? '-'}</p>
+            <p style={{ margin: '0 0 4px 0', color: '#475569', fontSize: 12 }}>{new Date(e.createdAt).toLocaleString()}</p>
+            <p style={{ margin: 0 }}>{e.message ?? '-'}</p>
+          </article>
+        ))}
+      </div>
+
+      <style>{`
+        @media (max-width: 980px) {
+          .desktop-table { display: none; }
+          .mobile-cards { display: grid !important; }
+        }
+      `}</style>
+    </AppShell>
   );
 }

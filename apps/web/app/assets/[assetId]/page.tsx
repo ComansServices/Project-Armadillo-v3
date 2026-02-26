@@ -1,6 +1,7 @@
 import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { AppShell } from '../../_components/app-shell';
 import CommandShortcuts from './command-shortcuts';
 
 type AssetDetail = {
@@ -121,11 +122,15 @@ export default async function AssetDetailPage({
   ];
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
+    <AppShell
+      title="Asset Detail"
+      purpose="Inspect one host deeply, annotate operator context, and launch safe action shortcuts."
+      whenToUse="Use this page during triage when a single asset needs deeper review."
+      firstAction="Confirm identity and last seen data, then review notes and shortcut commands."
+    >
       <p style={{ marginBottom: 12 }}>
         <Link href="/assets">← Back to assets</Link>
       </p>
-      <h1 style={{ marginBottom: 6 }}>Asset Detail</h1>
       <p style={{ marginTop: 0, color: '#444' }}>{data.id}</p>
       <p style={{ marginTop: 0 }}>
         <Link href={`/imports/${data.importId}`}>View source import →</Link>
@@ -174,6 +179,6 @@ export default async function AssetDetailPage({
       >
         {JSON.stringify(data.raw, null, 2)}
       </pre>
-    </main>
+    </AppShell>
   );
 }
