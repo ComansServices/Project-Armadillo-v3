@@ -1,6 +1,7 @@
 import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import CommandShortcuts from './command-shortcuts';
 
 type AssetDetail = {
   id: string;
@@ -86,6 +87,37 @@ export default async function AssetDetailPage({
   const labels = (data.annotations?.labels ?? []).join(', ');
   const notes = data.annotations?.notes ?? '';
 
+  const rawTarget = data.ip || data.hostname || '';
+  const safeTarget = /^[a-zA-Z0-9.:-]+$/.test(rawTarget) ? rawTarget : '';
+  const commandDisabledReason = safeTarget ? '' : 'No safe host/IP target available for command generation.';
+  const shortcuts = [
+    {
+      title: 'HTTP headers (curl)',
+      command: `curl -I --max-time 10 http://${safeTarget}`,
+      note: 'Fast liveness/header check over HTTP.'
+    },
+    {
+      title: 'HTTPS headers (curl)',
+      command: `curl -k -I --max-time 10 https://${safeTarget}`,
+      note: 'TLS endpoint probe (certificate validation bypass for diagnostics).'
+    },
+    {
+      title: 'Port 22 probe (netcat)',
+      command: `nc -vz ${safeTarget} 22`,
+      note: 'Quick SSH port reachability test.'
+    },
+    {
+      title: 'Port 80 probe (telnet style)',
+      command: `telnet ${safeTarget} 80`,
+      note: 'Legacy plain-port connectivity check.'
+    },
+    {
+      title: 'Web baseline scan (nikto)',
+      command: `nikto -h http://${safeTarget}`,
+      note: 'Basic web misconfig scan starter command.'
+    }
+  ];
+
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
       <p style={{ marginBottom: 12 }}>
@@ -123,6 +155,8 @@ export default async function AssetDetailPage({
           <button type="submit" disabled={!canEdit}>Save annotations</button>
         </div>
       </form>
+
+      <CommandShortcuts target={safeTarget} commands={shortcuts} disabledReason={commandDisabledReason || undefined} />
 
       <h2 style={{ marginBottom: 8 }}>Raw Asset Node</h2>
       <pre

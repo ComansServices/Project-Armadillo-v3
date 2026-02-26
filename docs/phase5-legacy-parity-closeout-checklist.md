@@ -27,10 +27,10 @@ Goal: close remaining legacy-era feature gaps in a controlled, one-by-one sequen
 - [x] Acceptance: legacy-equivalent chart visibility on core metrics
 
 ### 4) Host action shortcuts parity
-- [ ] Add UI actions to generate quick commands (curl/nikto/telnet-style)
-- [ ] Add copy-to-clipboard buttons with clean formatting
-- [ ] Add safeguards for unsafe command templates
-- [ ] Acceptance: operator can copy practical host commands from asset/host page
+- [x] Add UI actions to generate quick commands (curl/nikto/telnet-style)
+- [x] Add copy-to-clipboard buttons with clean formatting
+- [x] Add safeguards for unsafe command templates
+- [x] Acceptance: operator can copy practical host commands from asset/host page
 
 ### 5) Exploit enrichment parity
 - [ ] Add optional exploit-source enrichment adapter(s)
