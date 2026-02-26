@@ -18,8 +18,8 @@ const authHeaders = {
   ...(process.env.ARMADILLO_AUTH_TOKEN ? { 'x-armadillo-auth': process.env.ARMADILLO_AUTH_TOKEN } : {})
 };
 
-async function getScans(status?: string): Promise<ScanRecord[]> {
-  const qs = new URLSearchParams({ limit: '40' });
+async function getScans(status?: string, limit = 40): Promise<ScanRecord[]> {
+  const qs = new URLSearchParams({ limit: String(limit) });
   const res = await fetch(`${baseUrl}/api/v1/scans?${qs.toString()}`, {
     cache: 'no-store',
     headers: authHeaders
@@ -42,7 +42,8 @@ export default async function HomePage({
 }) {
   const params = searchParams ? await searchParams : undefined;
   const status = typeof params?.status === 'string' ? params.status : 'all';
-  const scans = await getScans(status);
+  const limit = typeof params?.limit === 'string' ? Math.max(10, Math.min(100, Number(params.limit) || 20)) : 20;
+  const scans = await getScans(status, limit);
 
   const counts = scans.reduce(
     (acc, s) => {
@@ -77,6 +78,12 @@ export default async function HomePage({
           <option value="running">running</option>
           <option value="completed">completed</option>
           <option value="failed">failed</option>
+        </select>
+        <label>Rows</label>
+        <select name="limit" defaultValue={String(limit)}>
+          <option value="20">20</option>
+          <option value="40">40</option>
+          <option value="80">80</option>
         </select>
         <button type="submit">Apply</button>
         <Link href="/">Reset</Link>

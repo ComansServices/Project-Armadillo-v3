@@ -131,7 +131,7 @@ export default async function ImportsPage({
           <p style={{ color: '#666', margin: 0 }}>No policies visible (viewer mode or none configured).</p>
         ) : (
           policies.map((p) => (
-            <form key={p.source} action={canEditPolicies ? savePolicyAction : undefined} style={{ display: 'flex', gap: 8, alignItems: 'center', border: '1px solid #eee', borderRadius: 8, padding: 10, flexWrap: 'wrap' }}>
+            <form className="policy-row" key={p.source} action={canEditPolicies ? savePolicyAction : undefined} style={{ display: 'flex', gap: 8, alignItems: 'center', border: '1px solid #eee', borderRadius: 8, padding: 10, flexWrap: 'wrap' }}>
               <input name="source" value={p.source} readOnly style={{ minWidth: 140 }} />
               <select name="enabled" defaultValue={String(p.enabled)} disabled={!canEditPolicies}><option value="true">enabled</option><option value="false">disabled</option></select>
               <select name="defaultQualityMode" defaultValue={p.defaultQualityMode} disabled={!canEditPolicies}><option value="strict">strict</option><option value="lenient">lenient</option></select>
@@ -203,6 +203,23 @@ export default async function ImportsPage({
         @media (max-width: 980px) {
           .desktop-table { display: none; }
           .mobile-cards { display: grid !important; }
+        }
+
+        @media (max-width: 420px) {
+          .policy-row {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr;
+            align-items: stretch !important;
+          }
+
+          .policy-row input[name='source'] {
+            grid-column: 1 / -1;
+          }
+
+          .policy-row button {
+            grid-column: 2;
+            justify-self: end;
+          }
         }
       `}</style>
     </AppShell>

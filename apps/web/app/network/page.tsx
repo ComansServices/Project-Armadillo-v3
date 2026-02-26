@@ -79,14 +79,20 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
   const assetPos = new Map<string, { x: number; y: number }>();
   const servicePos = new Map<string, { x: number; y: number }>();
 
+  const assetCols = Math.max(1, Math.min(6, assetNodes.length));
+  const assetGap = assetCols > 1 ? 760 / (assetCols - 1) : 0;
+  const assetStartX = assetCols > 1 ? 80 : 460;
   assetNodes.forEach((a, i) => {
-    const row = Math.floor(i / 6);
-    const col = i % 6;
-    assetPos.set(a.id, { x: 130 + col * 140, y: 90 + row * 95 });
+    const row = Math.floor(i / assetCols);
+    const col = i % assetCols;
+    assetPos.set(a.id, { x: assetStartX + col * assetGap, y: 95 + row * 95 });
   });
 
+  const svcCols = Math.max(1, Math.min(7, serviceNodesForGraph.length));
+  const svcGap = svcCols > 1 ? 760 / (svcCols - 1) : 0;
+  const svcStartX = svcCols > 1 ? 80 : 460;
   serviceNodesForGraph.forEach((s, i) => {
-    servicePos.set(s.id, { x: 70 + i * 120, y: 28 });
+    servicePos.set(s.id, { x: svcStartX + i * svcGap, y: 28 });
   });
 
   const graphLinks = data.links
@@ -153,7 +159,7 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
               ))}
             </div>
           ) : (
-            <svg width="100%" height={390} viewBox="0 0 920 390" preserveAspectRatio="xMinYMin meet" role="img" aria-label="Network topology mini map">
+            <svg className="network-map-svg" width="100%" height={390} viewBox="0 0 920 390" preserveAspectRatio="xMinYMin meet" role="img" aria-label="Network topology mini map">
               <rect x="0" y="0" width="920" height="390" fill="#f8fafc" />
 
               {graphLinks.map((l, idx) => {
@@ -328,6 +334,7 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
         @media (max-width: 980px) {
           .desktop-table { display: none; }
           .mobile-cards { display: grid !important; }
+          .network-map-svg { height: 520px; }
         }
       `}</style>
     </AppShell>
