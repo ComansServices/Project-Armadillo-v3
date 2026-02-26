@@ -44,6 +44,8 @@ Modern, queue-driven network discovery and security visibility platform.
 
 Here's what Armadillo looks like in action — screenshots from the running application:
 
+> **📸 Maintenance Note:** This visual tour is updated every time we ship major UI changes. See `scripts/take-screenshots.js` to regenerate. Last updated: 2026-02-27 (Phase 7 Sprint 2)
+
 ### 1. Overview — Command Centre
 ![Overview](docs/assets/screenshots/01-overview.png)
 
