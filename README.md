@@ -51,10 +51,15 @@ Implemented through **Step 23 kickoff**:
   - report automation + archive + digest + failure alerting in place
   - integration smoke script added: `scripts/integration_smoke_phase4.py`
   - beta checklist added: `docs/phase4-beta-readiness-checklist.md`
+- Phase 4.2 additions:
+  - CI gate script: `scripts/ci_phase4_gate.sh`
+  - GitHub workflow: `.github/workflows/phase4-gate.yml`
+  - threat model: `docs/phase4-threat-model.md`
+  - pen-test prep checklist: `docs/phase4-pen-test-prep-checklist.md`
 - Next planned dev pickup:
   - apply/verify perf indexes in all envs
-  - expand integration tests from smoke to CI-grade suite
-  - complete threat model + pen-test prep + rollback pack.
+  - complete rollback pack + migration notes for beta cut
+  - expand smoke checks into deeper integration assertions.
 
 ## Pipeline (v1 practical combo)
 `naabu -> nmap -> httpx -> nuclei`

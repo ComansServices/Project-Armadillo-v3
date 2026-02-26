@@ -1,0 +1,23 @@
+name: phase4-gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  smoke-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run Phase 4 gate
+        run: |
+          chmod +x scripts/ci_phase4_gate.sh
+          ./scripts/ci_phase4_gate.sh
