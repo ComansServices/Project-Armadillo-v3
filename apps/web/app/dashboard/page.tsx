@@ -32,7 +32,7 @@ function MiniBars({ title, rows, color }: { title: string; rows: Array<{ label: 
   return (
     <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 12, background: '#fff' }}>
       <h3 style={{ margin: '0 0 8px 0' }}>{title}</h3>
-      <svg width={420} height={Math.max(90, rows.length * 24 + 20)} viewBox={`0 0 420 ${Math.max(90, rows.length * 24 + 20)}`}>
+      <svg width="100%" height={Math.max(90, rows.length * 24 + 20)} viewBox={`0 0 420 ${Math.max(90, rows.length * 24 + 20)}`} preserveAspectRatio="xMinYMin meet">
         {rows.map((r, i) => {
           const y = 20 + i * 24;
           const w = (r.count / max) * 240;
@@ -66,7 +66,7 @@ function TrendSparkline({ rows }: { rows: Array<{ date: string; count: number }>
   return (
     <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 12, background: '#fff', marginBottom: 12 }}>
       <h3 style={{ margin: '0 0 8px 0' }}>Vulnerability trend</h3>
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMinYMin meet">
         <line x1={10} y1={95} x2={width - 10} y2={95} stroke="#cbd5e1" />
         <polyline fill="none" stroke="#2563eb" strokeWidth={2.2} points={points} />
         {rows.map((r, i) => {
@@ -100,7 +100,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
       <form method="get" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
         <label>Window days</label>
         <input name="days" defaultValue={String(safeDays)} style={{ width: 90 }} />
-        <input name="importId" placeholder="Filter import ID (optional)" defaultValue={importId} style={{ minWidth: 320 }} />
+        <input name="importId" placeholder="Filter import ID (optional)" defaultValue={importId} style={{ minWidth: 220, width: 'min(100%, 320px)' }} />
         <button type="submit">Apply</button>
         <a href={`${publicApiBaseUrl}/api/v1/dashboard/summary?days=${safeDays}${importId ? `&importId=${encodeURIComponent(importId)}` : ''}`} target="_blank" rel="noreferrer">Export JSON</a>
         <a href={`${publicApiBaseUrl}/api/v1/dashboard/summary?days=${safeDays}${importId ? `&importId=${encodeURIComponent(importId)}` : ''}&format=csv`} target="_blank" rel="noreferrer">Export CSV</a>
@@ -126,7 +126,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         </div>
       </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(430px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
         <MiniBars title="Top services" rows={data.topServices} color="#2563eb" />
         <MiniBars title="Top ports" rows={data.topPorts} color="#0f766e" />
         <MiniBars title="Top OS" rows={data.topOs} color="#7c3aed" />
