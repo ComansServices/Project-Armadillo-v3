@@ -42,6 +42,9 @@ export async function buildBrandedReportPdf(options: {
   subtitle?: string;
   audience?: 'ops' | 'exec';
   generatedAt?: string;
+  generatedFor?: string;
+  dateRange?: string;
+  confidentiality?: string;
   sections: Array<{ heading: string; lines: string[] }>;
 }) {
   const doc = new PDFDocument({ size: 'A4', margin: 40 });
@@ -50,28 +53,57 @@ export async function buildBrandedReportPdf(options: {
 
   const brandRed = '#b92128';
   const brandSlate = '#3d4e5c';
-
   const logoPath = path.resolve(process.cwd(), 'apps/api/assets/comans-logo.png');
-  try {
-    doc.image(logoPath, 40, 28, { fit: [140, 48], align: 'left', valign: 'top' });
-  } catch {
-    doc.fillColor(brandRed).fontSize(22).text('COMANS', 40, 34);
-    doc.fontSize(10).text('SERVICES', 135, 40);
+
+  const drawLogo = (x: number, y: number, w = 150, h = 52) => {
+    try {
+      doc.image(logoPath, x, y, { fit: [w, h], align: 'left', valign: 'top' });
+    } catch {
+      doc.fillColor(brandRed).fontSize(24).text('COMANS', x, y + 6);
+      doc.fontSize(10).text('SERVICES', x + 95, y + 12);
+    }
+  };
+
+  // Cover page
+  drawLogo(40, 34, 180, 62);
+  doc.rect(40, 120, 515, 2).fill(brandRed);
+  doc.fillColor(brandSlate).fontSize(28).text(options.title, 40, 150, { width: 510 });
+  doc.fillColor('#4b5563').fontSize(13).text(options.subtitle ?? (audience === 'exec' ? 'Executive summary view' : 'Operations detail view'), 40, 214, { width: 500 });
+
+  const coverMeta = [
+    `Generated for: ${options.generatedFor ?? 'Comans Internal Team'}`,
+    `Report audience: ${audience.toUpperCase()}`,
+    `Generated at: ${generatedAt}`,
+    `Date range: ${options.dateRange ?? 'Current dataset snapshot'}`,
+    `Classification: ${options.confidentiality ?? 'INTERNAL CONFIDENTIAL'}`
+  ];
+
+  let cy = 286;
+  doc.fillColor(brandSlate).fontSize(11);
+  for (const line of coverMeta) {
+    doc.text(line, 56, cy, { width: 480 });
+    cy += 22;
   }
 
-  doc.fillColor(brandSlate).fontSize(17).text(options.title, 40, 88);
-  doc.fontSize(11).text(options.subtitle ?? (audience === 'exec' ? 'Executive summary view' : 'Operations detail view'), 40, 110);
-  doc.fontSize(9).fillColor('#55606b').text(`Generated ${generatedAt}`, 40, 126);
-  doc.moveTo(40, 142).lineTo(555, 142).strokeColor('#d1d5db').stroke();
+  doc.roundedRect(40, 700, 515, 92, 8).fillAndStroke('#f9fafb', '#e5e7eb');
+  doc.fillColor(brandRed).fontSize(12).text('Confidentiality Notice', 56, 720);
+  doc.fillColor('#4b5563').fontSize(10).text('This report contains operational and security information intended only for authorised recipients.', 56, 742, { width: 480 });
 
-  let y = 152;
-  for (const section of options.sections.slice(0, 12)) {
+  // Detail page
+  doc.addPage();
+  drawLogo(40, 20, 130, 45);
+  doc.fillColor(brandSlate).fontSize(17).text(options.title, 40, 70);
+  doc.fontSize(9).fillColor('#55606b').text(`Generated ${generatedAt}`, 40, 88);
+  doc.moveTo(40, 102).lineTo(555, 102).strokeColor('#d1d5db').stroke();
+
+  let y = 114;
+  for (const section of options.sections.slice(0, 16)) {
     if (y > 760) break;
     doc.fillColor(brandRed).fontSize(13).text(section.heading, 40, y);
     y = doc.y + 2;
 
     doc.fillColor(brandSlate).fontSize(10);
-    for (const line of section.lines.slice(0, 60)) {
+    for (const line of section.lines.slice(0, 80)) {
       for (const wrapped of wrapLine(line, 112)) {
         if (y > 770) break;
         doc.text(`• ${wrapped}`, 52, y, { width: 500, lineGap: 1 });
@@ -83,7 +115,7 @@ export async function buildBrandedReportPdf(options: {
     y += 8;
   }
 
-  doc.fillColor('#6b7280').fontSize(9).text(`Audience: ${audience.toUpperCase()} • Internal Confidential`, 40, 805);
+  doc.fillColor('#6b7280').fontSize(9).text(`Audience: ${audience.toUpperCase()} • ${options.confidentiality ?? 'Internal Confidential'}`, 40, 805);
 
   return renderToBuffer(doc);
 }

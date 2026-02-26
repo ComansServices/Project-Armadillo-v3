@@ -708,6 +708,9 @@ app.get('/api/v1/reports/imports/:importId.pdf', async (req, reply) => {
     title: 'Armadillo Import Report',
     subtitle: `Import ${importRow.id}`,
     audience: reportAudience,
+    generatedFor: reportAudience === 'exec' ? 'Jason Comeau (CEO)' : `Ops Team (${importRow.requestedBy})`,
+    dateRange: againstImportId ? `${againstImportId} → ${importId}` : 'Single import snapshot',
+    confidentiality: 'INTERNAL CONFIDENTIAL',
     sections: [
       {
         heading: 'Import Overview',
@@ -793,6 +796,9 @@ app.get('/api/v1/reports/scans/:scanId.pdf', async (req, reply) => {
     title: 'Armadillo Scan Report',
     subtitle: `Scan ${scan.id}`,
     audience: reportAudience,
+    generatedFor: reportAudience === 'exec' ? 'Jason Comeau (CEO)' : `Ops Team (${scan.requestedBy})`,
+    dateRange: againstScanId ? `${againstScanId} → ${scanId}` : 'Single scan snapshot',
+    confidentiality: 'INTERNAL CONFIDENTIAL',
     sections: [
       {
         heading: 'Scan Overview',
