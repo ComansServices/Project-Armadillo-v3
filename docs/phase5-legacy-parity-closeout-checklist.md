@@ -15,9 +15,9 @@ Goal: close remaining legacy-era feature gaps in a controlled, one-by-one sequen
 ### 2) Network view / topology page
 - [x] Define network graph data endpoint (nodes, links, metadata)
 - [x] Implement `/network` page with host/service relationships
-- [ ] Add filters (import, subnet, service tag, open ports)
+- [x] Add filters (import, subnet, service tag, open ports)
 - [x] Add click-through to host/asset detail
-- [ ] Acceptance: parity-level network map usable for triage and discovery
+- [x] Acceptance: parity-level network map usable for triage and discovery *(table + mini-map + grouping view)*
 
 ### 3) Stats & charts dashboard parity
 - [ ] Build dashboard cards (hosts, open ports, high-risk findings)

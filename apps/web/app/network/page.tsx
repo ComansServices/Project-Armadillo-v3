@@ -70,6 +70,25 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
       return acc;
     }, {});
 
+  const assetNodes = assets.slice(0, 18);
+  const serviceNodesForGraph = serviceNodes.slice(0, 10);
+  const assetPos = new Map<string, { x: number; y: number }>();
+  const servicePos = new Map<string, { x: number; y: number }>();
+
+  assetNodes.forEach((a, i) => {
+    const row = Math.floor(i / 6);
+    const col = i % 6;
+    assetPos.set(a.id, { x: 130 + col * 140, y: 90 + row * 95 });
+  });
+
+  serviceNodesForGraph.forEach((s, i) => {
+    servicePos.set(s.id, { x: 70 + i * 120, y: 28 });
+  });
+
+  const graphLinks = data.links
+    .filter((l) => l.kind === 'has-service' && assetPos.has(l.source) && servicePos.has(l.target))
+    .slice(0, 80);
+
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
       <p style={{ marginBottom: 12 }}>
@@ -92,6 +111,52 @@ export default async function NetworkPage({ searchParams }: { searchParams?: Pro
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 130 }}><strong>Ports</strong><div>{portNodes.length}</div></div>
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 130 }}><strong>Services</strong><div>{serviceNodes.length}</div></div>
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 130 }}><strong>Links</strong><div>{data.summary.links}</div></div>
+      </div>
+
+      <h2 style={{ marginBottom: 8 }}>Topology mini-map</h2>
+      <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 8, marginBottom: 16, overflowX: 'auto', background: '#fcfcfd' }}>
+        <svg width={920} height={390} viewBox="0 0 920 390" role="img" aria-label="Network topology mini map">
+          <rect x="0" y="0" width="920" height="390" fill="#fcfcfd" />
+
+          {graphLinks.map((l, idx) => {
+            const a = assetPos.get(l.source)!;
+            const s = servicePos.get(l.target)!;
+            return (
+              <line
+                key={`${l.source}-${l.target}-${idx}`}
+                x1={s.x}
+                y1={s.y + 12}
+                x2={a.x}
+                y2={a.y - 10}
+                stroke="#d1d5db"
+                strokeWidth={1.2}
+              />
+            );
+          })}
+
+          {serviceNodesForGraph.map((s) => {
+            const p = servicePos.get(s.id)!;
+            return (
+              <g key={s.id}>
+                <circle cx={p.x} cy={p.y} r={12} fill="#7c3aed" />
+                <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="9" fill="#fff">S</text>
+                <text x={p.x} y={p.y + 26} textAnchor="middle" fontSize="9" fill="#4b5563">{s.label}</text>
+              </g>
+            );
+          })}
+
+          {assetNodes.map((a) => {
+            const p = assetPos.get(a.id)!;
+            const short = a.label.length > 18 ? `${a.label.slice(0, 18)}…` : a.label;
+            return (
+              <g key={a.id}>
+                <rect x={p.x - 45} y={p.y - 16} width={90} height={32} rx={8} fill="#0ea5e9" />
+                <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="9" fill="#fff">A</text>
+                <text x={p.x} y={p.y + 30} textAnchor="middle" fontSize="8.5" fill="#1f2937">{short}</text>
+              </g>
+            );
+          })}
+        </svg>
       </div>
 
       <h2 style={{ marginBottom: 8 }}>Service groups</h2>
