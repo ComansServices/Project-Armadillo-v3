@@ -6,7 +6,9 @@ type Summary = {
   topServices: Array<{ label: string; count: number }>;
   topPorts: Array<{ label: string; count: number }>;
   topOs: Array<{ label: string; count: number }>;
+  trend: Array<{ date: string; count: number }>;
   windowDays: number;
+  importId: string | null;
 };
 
 const baseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
@@ -16,8 +18,11 @@ const authHeaders = {
   'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
 };
 
-async function getSummary(days: number): Promise<Summary> {
-  const res = await fetch(`${baseUrl}/api/v1/dashboard/summary?days=${days}`, { cache: 'no-store', headers: authHeaders });
+async function getSummary(days: number, importId?: string): Promise<Summary> {
+  const qs = new URLSearchParams();
+  qs.set('days', String(days));
+  if (importId) qs.set('importId', importId);
+  const res = await fetch(`${baseUrl}/api/v1/dashboard/summary?${qs.toString()}`, { cache: 'no-store', headers: authHeaders });
   if (!res.ok) throw new Error(`Failed to fetch dashboard summary (${res.status})`);
   return (await res.json()) as Summary;
 }
@@ -44,15 +49,47 @@ function MiniBars({ title, rows, color }: { title: string; rows: Array<{ label: 
   );
 }
 
+function TrendSparkline({ rows }: { rows: Array<{ date: string; count: number }> }) {
+  const max = Math.max(1, ...rows.map((r) => r.count));
+  const width = 680;
+  const height = 120;
+  const xStep = rows.length > 1 ? (width - 30) / (rows.length - 1) : 0;
+
+  const points = rows
+    .map((r, i) => {
+      const x = 15 + i * xStep;
+      const y = 95 - (r.count / max) * 75;
+      return `${x},${y}`;
+    })
+    .join(' ');
+
+  return (
+    <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 12, background: '#fff', marginBottom: 12 }}>
+      <h3 style={{ margin: '0 0 8px 0' }}>Vulnerability trend</h3>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+        <line x1={10} y1={95} x2={width - 10} y2={95} stroke="#cbd5e1" />
+        <polyline fill="none" stroke="#2563eb" strokeWidth={2.2} points={points} />
+        {rows.map((r, i) => {
+          const x = 15 + i * xStep;
+          const y = 95 - (r.count / max) * 75;
+          return <circle key={`${r.date}-${i}`} cx={x} cy={y} r={2.8} fill="#1d4ed8" />;
+        })}
+      </svg>
+      <p style={{ marginTop: 6, color: '#475569', fontSize: 12 }}>Window: last {rows.length} day(s)</p>
+    </section>
+  );
+}
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function DashboardPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = searchParams ? await searchParams : undefined;
   const days = Number(typeof params?.days === 'string' ? params.days : '14') || 14;
+  const importId = typeof params?.importId === 'string' ? params.importId : '';
   const safeDays = Math.min(Math.max(days, 1), 90);
 
-  const data = await getSummary(safeDays);
+  const data = await getSummary(safeDays, importId || undefined);
 
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui' }}>
@@ -60,13 +97,17 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
       <h1 style={{ marginBottom: 8 }}>Dashboard parity</h1>
       <p style={{ marginTop: 0 }}>Item 3: stats + charts + export snapshot.</p>
 
-      <form method="get" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+      <form method="get" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
         <label>Window days</label>
         <input name="days" defaultValue={String(safeDays)} style={{ width: 90 }} />
+        <input name="importId" placeholder="Filter import ID (optional)" defaultValue={importId} style={{ minWidth: 320 }} />
         <button type="submit">Apply</button>
-        <a href={`${publicApiBaseUrl}/api/v1/dashboard/summary?days=${safeDays}`} target="_blank" rel="noreferrer">Export JSON</a>
-        <a href={`${publicApiBaseUrl}/api/v1/dashboard/summary?days=${safeDays}&format=csv`} target="_blank" rel="noreferrer">Export CSV</a>
+        <a href={`${publicApiBaseUrl}/api/v1/dashboard/summary?days=${safeDays}${importId ? `&importId=${encodeURIComponent(importId)}` : ''}`} target="_blank" rel="noreferrer">Export JSON</a>
+        <a href={`${publicApiBaseUrl}/api/v1/dashboard/summary?days=${safeDays}${importId ? `&importId=${encodeURIComponent(importId)}` : ''}&format=csv`} target="_blank" rel="noreferrer">Export CSV</a>
       </form>
+
+      <TrendSparkline rows={data.trend} />
+      {data.importId ? <p style={{ marginTop: 0, color: '#334155' }}>Scoped to import: <code>{data.importId}</code></p> : null}
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 10, minWidth: 130 }}><strong>Assets</strong><div>{data.totals.assets}</div></div>

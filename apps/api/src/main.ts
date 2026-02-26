@@ -941,16 +941,22 @@ app.get('/api/v1/dashboard/summary', async (req, reply) => {
   const actor = requireRole(req, reply, 'viewer');
   if (!actor) return;
 
-  const { days, format } = req.query as { days?: string; format?: string };
+  const { days, format, importId } = req.query as { days?: string; format?: string; importId?: string };
   const windowDays = Math.min(Math.max(Number(days ?? 14), 1), 90);
   const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
 
+  const assetWhere = importId ? { importId } : undefined;
+  const vulnWhere = {
+    detectedAt: { gte: since },
+    ...(importId ? { importId } : {})
+  };
+
   const [assetCount, importCount, scanCount, vulnRows, assets] = await Promise.all([
-    prisma.asset.count(),
-    prisma.xmlImport.count(),
+    prisma.asset.count({ where: assetWhere }),
+    prisma.xmlImport.count({ where: importId ? { id: importId } : undefined }),
     prisma.scan.count(),
-    prisma.assetVulnerability.findMany({ where: { detectedAt: { gte: since } }, select: { severity: true, detectedAt: true } }),
-    prisma.asset.findMany({ take: 1500, select: { ports: true, serviceTags: true, os: true } })
+    prisma.assetVulnerability.findMany({ where: vulnWhere, select: { severity: true, detectedAt: true } }),
+    prisma.asset.findMany({ where: assetWhere, take: 1500, select: { ports: true, serviceTags: true, os: true } })
   ]);
 
   const sev = { critical: 0, high: 0, medium: 0, low: 0 };
@@ -979,6 +985,16 @@ app.get('/api/v1/dashboard/summary', async (req, reply) => {
       .slice(0, n)
       .map(([label, count]) => ({ label, count }));
 
+  const dayBuckets: Record<string, number> = {};
+  for (let i = windowDays - 1; i >= 0; i -= 1) {
+    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    dayBuckets[d] = 0;
+  }
+  for (const r of vulnRows) {
+    const k = r.detectedAt.toISOString().slice(0, 10);
+    if (k in dayBuckets) dayBuckets[k] += 1;
+  }
+
   const summary = {
     totals: {
       assets: assetCount,
@@ -990,7 +1006,9 @@ app.get('/api/v1/dashboard/summary', async (req, reply) => {
     topServices: top(serviceCounts),
     topPorts: top(portCounts),
     topOs: top(osCounts),
-    windowDays
+    trend: Object.entries(dayBuckets).map(([date, count]) => ({ date, count })),
+    windowDays,
+    importId: importId ?? null
   };
 
   if (format === 'csv') {
@@ -1000,7 +1018,8 @@ app.get('/api/v1/dashboard/summary', async (req, reply) => {
       ...Object.entries(summary.severity).map(([k, v]) => `severity,${k},${v}`),
       ...summary.topServices.map((r) => `topServices,${r.label},${r.count}`),
       ...summary.topPorts.map((r) => `topPorts,${r.label},${r.count}`),
-      ...summary.topOs.map((r) => `topOs,${r.label},${r.count}`)
+      ...summary.topOs.map((r) => `topOs,${r.label},${r.count}`),
+      ...summary.trend.map((r) => `trend,${r.date},${r.count}`)
     ];
     reply.header('content-type', 'text/csv; charset=utf-8');
     reply.header('content-disposition', 'attachment; filename="armadillo-dashboard-summary.csv"');

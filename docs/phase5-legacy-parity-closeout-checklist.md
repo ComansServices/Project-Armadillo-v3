@@ -22,9 +22,9 @@ Goal: close remaining legacy-era feature gaps in a controlled, one-by-one sequen
 ### 3) Stats & charts dashboard parity
 - [x] Build dashboard cards (hosts, open ports, high-risk findings)
 - [x] Add charts for top services, ports, OS families, severity trends
-- [ ] Add date range/import filters *(date-range landed; import filter pending)*
+- [x] Add date range/import filters
 - [x] Add export snapshot capability (CSV/JSON)
-- [ ] Acceptance: legacy-equivalent chart visibility on core metrics
+- [x] Acceptance: legacy-equivalent chart visibility on core metrics
 
 ### 4) Host action shortcuts parity
 - [ ] Add UI actions to generate quick commands (curl/nikto/telnet-style)
