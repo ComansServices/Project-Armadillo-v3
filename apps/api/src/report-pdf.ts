@@ -1,5 +1,6 @@
 import path from 'node:path';
 import PDFDocument from 'pdfkit';
+import QRCode from 'qrcode';
 
 function wrapLine(input: string, maxChars = 110) {
   const words = input.split(/\s+/).filter(Boolean);
@@ -47,9 +48,11 @@ export async function buildBrandedReportPdf(options: {
   confidentiality?: string;
   metricCards?: Array<{ label: string; value: string; tone?: 'critical' | 'high' | 'medium' | 'low' | 'neutral' }>;
   signoff?: { name: string; role?: string };
+  preparedBy?: string;
+  dashboardUrl?: string;
   sections: Array<{ heading: string; lines: string[] }>;
 }) {
-  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
   const generatedAt = options.generatedAt ?? new Date().toISOString();
   const audience = options.audience ?? 'ops';
 
@@ -117,6 +120,11 @@ export async function buildBrandedReportPdf(options: {
   doc.fillColor('#374151').fontSize(10).text(`Signed: ${signoffName}`, 56, 760, { width: 220 });
   doc.text(signoffRole, 56, 774, { width: 280 });
 
+  const dashboardUrl = options.dashboardUrl ?? 'http://localhost:3000';
+  const qrPng = await QRCode.toBuffer(dashboardUrl, { width: 90, margin: 1 });
+  doc.image(qrPng, 452, 704, { fit: [88, 88] });
+  doc.fillColor('#6b7280').fontSize(8).text('Live dashboard', 456, 792, { width: 88, align: 'center' });
+
   // Detail page
   doc.addPage();
   drawLogo(40, 20, 130, 45);
@@ -144,6 +152,14 @@ export async function buildBrandedReportPdf(options: {
   }
 
   doc.fillColor('#6b7280').fontSize(9).text(`Audience: ${audience.toUpperCase()} • ${options.confidentiality ?? 'Internal Confidential'}`, 40, 805);
+
+  const pageRange = doc.bufferedPageRange();
+  const preparedBy = options.preparedBy ?? 'Leo (Comans Services)';
+  for (let i = 0; i < pageRange.count; i += 1) {
+    doc.switchToPage(i);
+    doc.fillColor('#9ca3af').fontSize(8).text(`Prepared by ${preparedBy}`, 40, 820, { width: 220 });
+    doc.text(`Page ${i + 1} of ${pageRange.count}`, 460, 820, { width: 95, align: 'right' });
+  }
 
   return renderToBuffer(doc);
 }

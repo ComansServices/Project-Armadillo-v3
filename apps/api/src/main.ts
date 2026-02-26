@@ -718,6 +718,8 @@ app.get('/api/v1/reports/imports/:importId.pdf', async (req, reply) => {
       { label: 'Low', value: String(sev.low ?? 0), tone: 'low' }
     ],
     signoff: { name: 'Jason Comeau', role: 'CEO, Comans Services' },
+    preparedBy: 'Leo • Comans Services',
+    dashboardUrl: `http://localhost:3000/imports/${importId}`,
     sections: [
       {
         heading: 'Import Overview',
@@ -813,6 +815,8 @@ app.get('/api/v1/reports/scans/:scanId.pdf', async (req, reply) => {
       { label: 'Low', value: String(sev.low ?? 0), tone: 'low' }
     ],
     signoff: { name: 'Jason Comeau', role: 'CEO, Comans Services' },
+    preparedBy: 'Leo • Comans Services',
+    dashboardUrl: `http://localhost:3000/scans/${scanId}`,
     sections: [
       {
         heading: 'Scan Overview',
