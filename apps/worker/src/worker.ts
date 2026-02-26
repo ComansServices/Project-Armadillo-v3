@@ -24,7 +24,8 @@ async function archiveScanReports(scanId: string) {
       const res = await fetch(url, {
         headers: {
           'x-armadillo-user': 'worker-auto-report',
-          'x-armadillo-role': 'viewer'
+          'x-armadillo-role': 'viewer',
+          ...(process.env.ARMADILLO_AUTH_TOKEN ? { 'x-armadillo-auth': process.env.ARMADILLO_AUTH_TOKEN } : {})
         }
       });
       if (!res.ok) {

@@ -23,7 +23,8 @@ const baseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL
 const publicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 const authHeaders = {
   'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
-  'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
+  'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer',
+  ...(process.env.ARMADILLO_AUTH_TOKEN ? { 'x-armadillo-auth': process.env.ARMADILLO_AUTH_TOKEN } : {})
 };
 
 const sevRank: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };

@@ -14,7 +14,8 @@ const baseUrl =
 
 const authHeaders = {
   'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
-  'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer'
+  'x-armadillo-role': process.env.WEB_ACTOR_ROLE ?? 'viewer',
+  ...(process.env.ARMADILLO_AUTH_TOKEN ? { 'x-armadillo-auth': process.env.ARMADILLO_AUTH_TOKEN } : {})
 };
 
 async function getScans(): Promise<ScanRecord[]> {

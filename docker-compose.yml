@@ -24,6 +24,10 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       DATABASE_URL: postgres://armadillo:armadillo@postgres:5432/armadillo
+      AUTH_SESSION_SECRET: armadillo-dev-session-secret
+      AUTH_ALLOW_LEGACY_HEADERS: "false"
+      AUTH_FAIL_THRESHOLD: 5
+      AUTH_LOCK_MINUTES: 15
     depends_on:
       - redis
       - postgres
@@ -40,6 +44,7 @@ services:
       REDIS_PORT: 6379
       WORKER_CONCURRENCY: 4
       DATABASE_URL: postgres://armadillo:armadillo@postgres:5432/armadillo
+      ARMADILLO_AUTH_TOKEN: v1.eyJzdWIiOiJzZXJ2aWNlLXdlYiIsInJvbGUiOiJvd25lciIsIm9yZ0lkIjoiY29tYW5zIiwicHJvamVjdHMiOlsiKiJdLCJleHAiOjQxMDI0NDQ4MDAsImlhdCI6MTc3MjA5MDAwMCwic2lkIjoic3ZjLXdlYiJ9.5a54ab0c9c359e750e91b9648cfc33c805c6b859c8a3960f2931f0dd374f6601
     depends_on:
       - redis
       - postgres
@@ -52,6 +57,7 @@ services:
     environment:
       API_BASE_URL: http://api:4000
       NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+      ARMADILLO_AUTH_TOKEN: v1.eyJzdWIiOiJzZXJ2aWNlLXdlYiIsInJvbGUiOiJvd25lciIsIm9yZ0lkIjoiY29tYW5zIiwicHJvamVjdHMiOlsiKiJdLCJleHAiOjQxMDI0NDQ4MDAsImlhdCI6MTc3MjA5MDAwMCwic2lkIjoic3ZjLXdlYiJ9.5a54ab0c9c359e750e91b9648cfc33c805c6b859c8a3960f2931f0dd374f6601
     depends_on:
       - api
     ports:
