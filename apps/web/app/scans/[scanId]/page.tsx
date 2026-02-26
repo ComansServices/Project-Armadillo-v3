@@ -109,14 +109,14 @@ export default async function ScanDetailPage({
 
       <p style={{ marginTop: 0, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <a
-          href={`${publicApiBaseUrl}/api/v1/reports/scans/${scan.id}.pdf${effectiveAgainstScanId ? `?againstScanId=${effectiveAgainstScanId}&audience=ops` : '?audience=ops'}`}
+          href={`${publicApiBaseUrl}/api/v1/reports/scans/${scan.id}.pdf${effectiveAgainstScanId ? `?againstScanId=${effectiveAgainstScanId}&audience=ops&archive=1` : '?audience=ops&archive=1'}`}
           target="_blank"
           rel="noreferrer"
         >
           Download Ops scan PDF report →
         </a>
         <a
-          href={`${publicApiBaseUrl}/api/v1/reports/scans/${scan.id}.pdf${effectiveAgainstScanId ? `?againstScanId=${effectiveAgainstScanId}&audience=exec` : '?audience=exec'}`}
+          href={`${publicApiBaseUrl}/api/v1/reports/scans/${scan.id}.pdf${effectiveAgainstScanId ? `?againstScanId=${effectiveAgainstScanId}&audience=exec&archive=1` : '?audience=exec&archive=1'}`}
           target="_blank"
           rel="noreferrer"
         >
