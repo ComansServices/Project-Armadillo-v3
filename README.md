@@ -57,6 +57,35 @@ Modern, queue-driven network discovery and security visibility platform.
 - **Customer portal stub** — Read-only tenant view with separate auth scope
 - **Kubernetes production** — EKS+Fargate, KEDA auto-scaling, Aurora Global
 
+### Phase 9 — Host Telemetry & Endpoint Awareness (Proposed)
+Lightweight agents for Linux, Windows, and macOS endpoints that feed continuous local telemetry into Armadillo.
+
+**Sprint 1 — Agent Core & Linux Support:**
+- Go-based agent SDK with mTLS
+- eBPF process event collection
+- Host Telemetry Service API (`/api/v1/telemetry/batch`)
+- Agent management UI (`/agents`)
+
+**Sprint 2 — Windows & macOS Agents:**
+- Windows service (ETW events, Event Log shipping)
+- macOS agent (ESF, FSEvents)
+- Cross-platform software inventory
+- Version drift detection
+
+**Sprint 3 — Threat Detection & Response:**
+- Lateral movement detection
+- Privilege escalation alerts
+- File integrity monitoring (FIM)
+- IOC matching
+- Remote response: kill process, quarantine host
+
+**Sprint 4 — Compliance & Reporting:**
+- CIS benchmark checks
+- Compliance dashboard (pass/fail trends)
+- Configuration drift alerts
+- User activity audit trails
+- Agent health monitoring
+
 ---
 
 ## Quick Start (one command)
@@ -164,6 +193,7 @@ colima start
 - `docs/phase7-improvements-roadmap.md` — Operator confidence features
 - `docs/sprint-phase7-1.md` — Sprint 1 completion (remediation tracking)
 - `docs/sprint-phase7-2.md` — Sprint 2 progress (risk prioritization)
+- `docs/phase9-host-telemetry-roadmap.md` — Host agents & endpoint awareness
 - `docs/ops-register.md` — Current operational status & decisions
 - `k8s/` — Kubernetes deployment specs
 - `docs/infrastructure/ARMADILLO-SCALE-PLAN.md` — Scale infrastructure blueprint
