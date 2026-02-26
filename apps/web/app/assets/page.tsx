@@ -17,15 +17,9 @@ type AssetRecord = {
   createdAt: string;
 };
 
-type AssetFilters = {
-  ip?: string;
-  hostname?: string;
-  tag?: string;
-  source?: string;
-};
+type AssetFilters = { ip?: string; hostname?: string; tag?: string; source?: string };
 
-const baseUrl =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+const baseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
 const authHeaders = {
   'x-armadillo-user': process.env.WEB_ACTOR_ID ?? 'web-ui',
@@ -41,15 +35,8 @@ async function getAssets(filters: AssetFilters): Promise<AssetRecord[]> {
   if (filters.tag) qs.set('tag', filters.tag);
   if (filters.source) qs.set('source', filters.source);
 
-  const res = await fetch(`${baseUrl}/api/v1/assets?${qs.toString()}`, {
-    cache: 'no-store',
-    headers: authHeaders
-  });
-
-  if (!res.ok) {
-    throw new Error(`Failed to fetch assets (${res.status})`);
-  }
-
+  const res = await fetch(`${baseUrl}/api/v1/assets?${qs.toString()}`, { cache: 'no-store', headers: authHeaders });
+  if (!res.ok) throw new Error(`Failed to fetch assets (${res.status})`);
   const data = (await res.json()) as { assets: AssetRecord[] };
   return data.assets ?? [];
 }
@@ -78,69 +65,72 @@ export default async function AssetsPage({
       whenToUse="Use this page after imports to review discovered infrastructure quickly."
       firstAction="Apply a filter (IP, hostname, tag), then open a target asset detail."
     >
-
-      <form method="get" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(4, minmax(0,1fr))' }}>
+      <form method="get" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
         <input name="ip" placeholder="Filter IP (e.g. 10.0.0)" defaultValue={filters.ip ?? ''} />
         <input name="hostname" placeholder="Filter hostname" defaultValue={filters.hostname ?? ''} />
         <input name="tag" placeholder="Filter tag (e.g. web)" defaultValue={filters.tag ?? ''} />
         <input name="source" placeholder="Filter source (e.g. xml)" defaultValue={filters.source ?? ''} />
-        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8 }}>
+        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="submit">Apply filters</button>
           <Link href="/assets">Reset</Link>
+          <Link href="/vulns">Open vulnerabilities</Link>
+          <Link href="/network">Open network</Link>
         </div>
       </form>
 
-
-      <div style={{ overflowX: 'auto', marginTop: 16 }}>
+      <div className="desktop-table" style={{ overflowX: 'auto', marginTop: 16 }}>
         <table style={{ borderCollapse: 'collapse', minWidth: 1100, width: '100%' }}>
           <thead>
             <tr>
-              {['Asset ID', 'Identity Key', 'IP', 'Hostname', 'Ports', 'Tags', 'Seen', 'Last Seen', 'Import ID'].map(
-                (h) => (
-                  <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>
-                    {h}
-                  </th>
-                )
-              )}
+              {['Asset', 'Identity Key', 'IP', 'Hostname', 'Ports', 'Tags', 'Seen', 'Last Seen', 'Import', 'Actions'].map((h) => (
+                <th key={h} style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '8px 10px' }}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {assets.length === 0 ? (
-              <tr>
-                <td colSpan={9} style={{ padding: '12px 10px', color: '#666' }}>
-                  No assets matched current filters.
+              <tr><td colSpan={10} style={{ padding: '12px 10px', color: '#666' }}>No assets matched current filters.</td></tr>
+            ) : assets.map((a) => (
+              <tr key={a.id}>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{a.id}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{a.identityKey}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.ip ?? '-'}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.hostname ?? '-'}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.ports?.length ? a.ports.join(', ') : '-'}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.serviceTags?.length ? a.serviceTags.join(', ') : '-'}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.seenCount}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{new Date(a.lastSeenAt).toLocaleString()}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>{a.importId}</td>
+                <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
+                  <Link href={`/assets/${a.id}`}>Open</Link>
                 </td>
               </tr>
-            ) : (
-              assets.map((a) => (
-                <tr key={a.id}>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>
-                    <Link href={`/assets/${a.id}`}>{a.id}</Link>
-                  </td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>
-                    {a.identityKey}
-                  </td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.ip ?? '-'}</td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.hostname ?? '-'}</td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                    {a.ports?.length ? a.ports.join(', ') : '-'}
-                  </td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                    {a.serviceTags?.length ? a.serviceTags.join(', ') : '-'}
-                  </td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>{a.seenCount}</td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px' }}>
-                    {new Date(a.lastSeenAt).toLocaleString()}
-                  </td>
-                  <td style={{ borderBottom: '1px solid #f0f0f0', padding: '8px 10px', fontFamily: 'monospace' }}>
-                    <Link href={`/imports/${a.importId}`}>{a.importId}</Link>
-                  </td>
-                </tr>
-              ))
-            )}
+            ))}
           </tbody>
         </table>
       </div>
+
+      <div className="mobile-cards" style={{ display: 'none', gap: 8, marginTop: 12 }}>
+        {assets.length === 0 ? <p style={{ color: '#666' }}>No assets matched current filters.</p> : assets.map((a) => (
+          <article key={`card-${a.id}`} style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, background: '#fff' }}>
+            <p style={{ margin: '0 0 4px 0', fontFamily: 'monospace', fontSize: 12 }}>{a.identityKey}</p>
+            <p style={{ margin: '0 0 4px 0' }}><strong>IP:</strong> {a.ip ?? '-'}</p>
+            <p style={{ margin: '0 0 4px 0' }}><strong>Ports:</strong> {a.ports?.length ? a.ports.join(', ') : '-'}</p>
+            <p style={{ margin: '0 0 8px 0' }}><strong>Tags:</strong> {a.serviceTags?.length ? a.serviceTags.join(', ') : '-'}</p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <Link href={`/assets/${a.id}`}>Open asset</Link>
+              <Link href={`/vulns?importId=${encodeURIComponent(a.importId)}`}>View import vulns</Link>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <style>{`
+        @media (max-width: 980px) {
+          .desktop-table { display: none; }
+          .mobile-cards { display: grid !important; }
+        }
+      `}</style>
     </AppShell>
   );
 }
