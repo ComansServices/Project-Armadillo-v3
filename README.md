@@ -2,6 +2,14 @@
 
 Modern, queue-driven network discovery and security visibility platform.
 
+## Specification Sync (v3.3)
+- **Spec version:** 3.3 — Full Spec + Architecture + Security Hardening
+- **Spec date:** 28 February 2026
+- **Coverage:** 63 user stories across 26 sections, with complete architecture + data model roadmap
+- **Source documents (archived):**
+  - `docs/spec-sync/Project-Armadillo-v3.3-2026-02-28.docx`
+  - `docs/spec-sync/Project-Armadillo-v3.3-2026-02-28.txt`
+
 ## Current platform includes
 - Next.js web app (`apps/web`)
 - Fastify API (`apps/api`)
@@ -11,7 +19,7 @@ Modern, queue-driven network discovery and security visibility platform.
 
 ---
 
-## 🎯 Current Status (as of 2026-02-27)
+## 🎯 Current Status (as of 2026-02-28)
 
 | Phase | Status | Notes |
 |-------|--------|-------|
@@ -362,6 +370,8 @@ colima start
 - Legacy header trust disabled in production
 - Project scope enforcement active for scan/schedule paths
 - Auth audit and lockout controls active
+- Multi-tenant isolation strategy documented as dual-layer: Prisma project scoping + PostgreSQL RLS (spec requirement)
+- Zod validation at API/external boundaries is a mandatory hardening requirement in v3.3 spec
 - Dev mode alert suppression available (`ARMADILLO_DEV_MODE=1`)
 
 ---
