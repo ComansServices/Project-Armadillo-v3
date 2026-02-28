@@ -9,6 +9,8 @@ Modern, queue-driven network discovery and security visibility platform.
 - **Source documents (archived):**
   - `docs/spec-sync/Project-Armadillo-v3.3-2026-02-28.docx`
   - `docs/spec-sync/Project-Armadillo-v3.3-2026-02-28.txt`
+  - `docs/spec-sync/ArmadilloToolsMap-2026-02-28.tsx` (tools/data acquisition mapping UI artifact)
+  - `docs/spec-sync/SprintPlanner-2026-02-28.tsx` (sprint sequencing/dependency planning UI artifact)
 
 ## Current platform includes
 - Next.js web app (`apps/web`)
