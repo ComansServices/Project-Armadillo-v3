@@ -12,6 +12,12 @@ Modern, queue-driven network discovery and security visibility platform.
   - `docs/spec-sync/ArmadilloToolsMap-2026-02-28.tsx` (tools/data acquisition mapping UI artifact)
   - `docs/spec-sync/SprintPlanner-2026-02-28.tsx` (sprint sequencing/dependency planning UI artifact)
 
+## Tightened Implementation Brief (from latest planning artifacts)
+- **Program scope:** 74 planned items total (11 infra + 63 feature stories)
+- **Delivery horizon:** 11 sprints / ~24 weeks (MVP target by Sprint 3)
+- **Critical path:** `INFRA-05` → `INFRA-06` → `INFRA-11` → `US-INT.01` → `US-INT.03` → `US-8.08` → `US-AI.01` → `US-COMP.01` → `US-REV.02`
+- **Execution model:** Open-source-first stack (Ollama, MinIO, SMTP, public intel feeds) with optional cloud upgrades only where needed.
+
 ## Current platform includes
 - Next.js web app (`apps/web`)
 - Fastify API (`apps/api`)

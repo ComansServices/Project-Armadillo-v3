@@ -1,6 +1,6 @@
 # Armadillo v3 — Ops Register
 
-Last updated: 2026-02-26 20:29 AEDT
+Last updated: 2026-02-28 19:16 AEDT
 Owner: Comans / Leo
 
 ## Current Program Status
@@ -67,3 +67,4 @@ Owner: Comans / Leo
   - ✅ Item 2: Blast radius chips with live API data
   - ✅ Item 3: Attack path simulation API (entry → target path with vulns)
   - 🔲 Item 4: Exposure scoring (internet-facing detection)
+- **Spec sync refresh (2026-02-28)** — archived v3.3 source artifacts in `docs/spec-sync/` (docx/txt + tools map + sprint planner TSX), tightened README with a concise implementation brief (scope/timeline/critical path), and aligned repo docs to latest planning inputs.
