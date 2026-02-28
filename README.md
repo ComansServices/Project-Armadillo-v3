@@ -215,49 +215,27 @@ It won't replace a dedicated security team for a Fortune 500. But for the thousa
 
 ## 🗺️ Future Roadmap
 
-### Phase 7 Sprint 3 — Operator Usability (Planned)
-- Incident runbooks UI with step-by-step guidance
-- Evidence collection for findings (screenshots, logs, notes)
-- Team skill matrix + assignment routing
-- Bulk remediation actions
-- Time-to-remediate dashboards
+Roadmap is now aligned to the v3.3 planning set (74 items: 11 infra + 63 feature stories) with a dependency-mapped sprint sequence.
 
-### Phase 8 — MSP Integration & Scale (Proposed)
-- **Quality alert routing** — Auto-Teams ping when import quality = fail
-- **Scan failure escalation** — 3x consecutive failures → admin notification
-- **Schedule conflict warnings** — Calendar heatmap + overlap detection
-- **Reports delivery tracking** — "Sent/Pending/Acknowledged" workflow
-- **Customer portal stub** — Read-only tenant view with separate auth scope
-- **Kubernetes production** — EKS+Fargate, KEDA auto-scaling, Aurora Global
+### Delivery timeline (planned)
+- **Sprint 0 (2w): Foundation & Infra** — RBAC models, RLS, Prisma scoping middleware, Zod validation, EPSS/KEV workers, scoring package, MinIO, notification router, Ollama gateway.
+- **Sprint 1 (2w): Intelligence + Core UX** — EPSS/KEV surfacing, composite risk scoring, bulk remediation extension, vulnerability aging/SLA warnings, saved views.
+- **Sprint 2 (2w): Auth + PSA + AI** — API keys, ConnectWise/Halo ticketing, AI remediation guidance, multi-tenant dashboard aggregation.
+- **Sprint 3 (2w): Compliance + Revenue** — Essential Eight mapping, posture score (client-facing), pre-sales risk report, runbook library + evidence foundation.
+- **Sprint 4–8 (10w): Scale, automation, and ops maturity** — webhooks, Teams/Slack routing, digests, customer portal, advanced compliance, AI suite, RMM sync, evidence/report packs, dashboard customisation, SIEM/IaC/K8s options.
+- **Sprint 9–10 (6w): Phase 9 Host Telemetry track** — Linux + Windows agents, eBPF/ETW telemetry, FIM, remote response, CIS benchmark coverage.
 
-### Phase 9 — Host Telemetry & Endpoint Awareness (Proposed)
-Lightweight agents for Linux, Windows, and macOS endpoints that feed continuous local telemetry into Armadillo.
+### MVP target
+- **MVP window:** Sprints 0–3 (**~8 weeks**)
+- **MVP outcomes:** exploitability-led prioritisation, PSA-linked remediation workflow, posture/compliance baseline, and client-grade reporting foundation.
 
-**Sprint 1 — Agent Core & Linux Support:**
-- Go-based agent SDK with mTLS
-- eBPF process event collection
-- Host Telemetry Service API (`/api/v1/telemetry/batch`)
-- Agent management UI (`/agents`)
+### Critical path (must protect)
+`INFRA-05 → INFRA-06 → INFRA-11 → US-INT.01 → US-INT.03 → US-8.08 → US-AI.01 → US-COMP.01 → US-REV.02`
 
-**Sprint 2 — Windows & macOS Agents:**
-- Windows service (ETW events, Event Log shipping)
-- macOS agent (ESF, FSEvents)
-- Cross-platform software inventory
-- Version drift detection
-
-**Sprint 3 — Threat Detection & Response:**
-- Lateral movement detection
-- Privilege escalation alerts
-- File integrity monitoring (FIM)
-- IOC matching
-- Remote response: kill process, quarantine host
-
-**Sprint 4 — Compliance & Reporting:**
-- CIS benchmark checks
-- Compliance dashboard (pass/fail trends)
-- Configuration drift alerts
-- User activity audit trails
-- Agent health monitoring
+### Execution principles
+- **Open-source-first by default:** Ollama, MinIO, SMTP, public intelligence feeds.
+- **Cloud optionality, not dependency:** only where value materially exceeds local-hosted path.
+- **Queue-driven reliability:** background jobs and retries for all integration-heavy flows.
 
 ---
 
