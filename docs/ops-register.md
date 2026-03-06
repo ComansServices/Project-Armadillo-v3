@@ -1,6 +1,6 @@
 # Armadillo v3 — Ops Register
 
-Last updated: 2026-02-28 19:16 AEDT
+Last updated: 2026-03-04 23:27 AEDT
 Owner: Comans / Leo
 
 ## Current Program Status
@@ -47,6 +47,7 @@ Owner: Comans / Leo
 4. Plan auth next increment discovery (interactive OIDC/SAML UX + token/secret rotation strategy)
 
 ## Change Log (today)
+- Registered skills update: installed and published `humanizer` skill to `openclaw-skills` repo for production use in content polishing workflows
 - Added `docs/phase6-usability-modern-ui-plan.md`
 - Updated parity and auth-hardening completion status
 - Registered transition from feature parity to usability modernization
